@@ -1,0 +1,28 @@
+{
+  "_id": "ro_ta_034fc6b1ac194beeb949f8b7739d8a11_e45af38a006c49b092f11f03ceb59837",
+  "_rev": "1-8e2fd80551771c52e2359226b054d327",
+  "TypeError": "Up hình toa thuốc (đơn hàng thuốc kê toa)",
+  "NumberCameras": [
+    "5"
+  ],
+  "File": [
+    {
+      "size": 741812,
+      "name": "19.jpg",
+      "url": "/prod-budi-app-assets/app_fe3bc256a9834edd92bcd6d17a51e864/attachments/854e400c-9b52-4072-a3d5-57171a4f7d5a.jpg",
+      "extension": "jpg",
+      "key": "app_fe3bc256a9834edd92bcd6d17a51e864/attachments/854e400c-9b52-4072-a3d5-57171a4f7d5a.jpg"
+    }
+  ],
+  "Description": "NV không chụp và up hình toa thuốc",
+  "TicketID": "ro_ta_906c3ea9f5ce4b218b9597bec3f77298_2b92c46a67874283badc0d35c234dca6",
+  "CreatedByEmail": "DucNM79@fpt.com",
+  "UpdatedByEmail": "DucNM79@fpt.com",
+  "tableId": "ta_034fc6b1ac194beeb949f8b7739d8a11",
+  "Auto ID": 50857,
+  "Created At": "2026-10-09T14:32:18.645Z",
+  "Updated At": "2026-10-09T14:32:18.645Z",
+  "type": "row",
+  "createdAt": "2026-10-09T14:32:18.709Z",
+  "updatedAt": "2026-10-09T14:32:18.709Z"
+}

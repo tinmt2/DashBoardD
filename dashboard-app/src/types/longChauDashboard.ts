@@ -1,0 +1,46 @@
+export interface ErrorTypeStat {
+  errorType: string;
+  count: number;
+}
+
+export interface EmployeeErrorRanking {
+  employeeName: string;
+  errorCount: number;
+}
+
+export interface ShopErrorRanking {
+  shopCode: string;
+  shopName: string;
+  errorCount: number;
+}
+
+export interface RegionErrorStat {
+  region: string;
+  errorCount: number;
+}
+
+export interface LongChauDashboardSummary {
+  totalChecked: number;
+  totalErrors: number;
+  errorRate: number;
+  totalEmployees: number;
+  employeesWithErrors: number;
+  totalShops: number;
+
+  chainStats: {
+    total: number;
+    errors: number;
+    errorRate: number;
+  };
+
+  errorTypeStats: ErrorTypeStat[];
+  employeeErrorRanking: EmployeeErrorRanking[];
+  shopErrorRanking: ShopErrorRanking[];
+  regionErrorStats: RegionErrorStat[];
+}
+
+export interface LongChauDashboardResponse {
+  success: boolean;
+  chain: string;
+  data: LongChauDashboardSummary;
+}

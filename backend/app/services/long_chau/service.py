@@ -1,0 +1,296 @@
+"""
+LongChâu import service: preview job, commit with duplicate protection, history.
+
+Duplicate protection is two-layered:
+  1. Application level: committable rows whose ``dedup_key`` already exists in
+     ``long_chau_ticket_details`` (or earlier in the same batch) are skipped.
+  2. Database level: ``long_chau_ticket_details.dedup_key`` is UNIQUE, so a
+     concurrent commit of the same data fails atomically instead of inserting
+     duplicates.
+"""
+from __future__ import annotations
+
+import json
+import logging
+import uuid
+from datetime import date, datetime, timezone
+from typing import Any, Dict, Iterable, List, Set
+
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from app.models.long_chau import LongChauImportJob, LongChauTicketDetail
+from app.repositories.ticket_repository import SQLiteTicketRepository
+from app.schemas.ticket import CHAIN_LONG_CHAU, TicketRecord
+from app.services.long_chau.importer import ImportAnalysis, LongChauExcelImporter
+from app.services.long_chau.parser import LongChauParseError
+
+logger = logging.getLogger(__name__)
+
+MAX_PREVIEW_ROWS = 1000
+_SQLITE_IN_CHUNK = 500  # stay below SQLite's bound-parameter limit
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _chunks(items: List[str], size: int) -> Iterable[List[str]]:
+    for i in range(0, len(items), size):
+        yield items[i:i + size]
+
+
+class LongChauImportService:
+    def __init__(self, db: Session):
+        self.db = db
+        self.importer = LongChauExcelImporter()
+        self.ticket_repo = SQLiteTicketRepository(db)
+
+    # ----------------------------------------------------------------- helpers
+    def _existing_keys(self, keys: List[str]) -> Set[str]:
+        found: Set[str] = set()
+        unique = list(dict.fromkeys(keys))
+        for chunk in _chunks(unique, _SQLITE_IN_CHUNK):
+            rows = (
+                self.db.query(LongChauTicketDetail.dedup_key)
+                .filter(LongChauTicketDetail.dedup_key.in_(chunk))
+                .all()
+            )
+            found.update(r[0] for r in rows)
+        return found
+
+    def _get_job(self, import_id: str) -> LongChauImportJob | None:
+        return self.db.query(LongChauImportJob).filter(LongChauImportJob.id == import_id).first()
+
+    def _fail(self, job: LongChauImportJob, message: str) -> None:
+        self.db.rollback()
+        job = self._get_job(job.id) or job
+        job.status = "FAILED"
+        job.error_message = message
+        self.db.add(job)
+        self.db.commit()
+
+    # ----------------------------------------------------------------- preview
+    def preview(self, filename: str, content: bytes) -> Dict[str, Any]:
+        job = LongChauImportJob(
+            id=str(uuid.uuid4()),
+            chain=CHAIN_LONG_CHAU,
+            filename=filename,
+            created_at=_utcnow(),
+            status="PARSING",
+        )
+        self.db.add(job)
+        self.db.commit()
+
+        try:
+            analysis = self.importer.analyze(content, filename)
+        except LongChauParseError as exc:
+            self._fail(job, str(exc))
+            return {"success": False, "importId": job.id, "status": "FAILED", "error_message": str(exc)}
+        except Exception as exc:  # unexpected – never leave the job hanging
+            logger.exception("[LONG_CHAU_IMPORT] preview failed")
+            msg = f"Lỗi không xác định khi đọc file: {exc}"
+            self._fail(job, msg)
+            return {"success": False, "importId": job.id, "status": "FAILED", "error_message": msg}
+
+        try:
+            committable = analysis.committable_rows
+            imported_at = _utcnow()
+            payload = []
+            for r in committable:
+                record = self.importer.mapper.build_ticket_record(r.mapped, imported_at)
+                payload.append({
+                    "dedup_key": r.dedup_key,
+                    "record": record.model_dump(mode="json"),
+                    "detail": self.importer.mapper.build_detail(r.mapped),
+                })
+            already_imported = len(self._existing_keys([p["dedup_key"] for p in payload]))
+
+            job.file_format = analysis.file_format
+            job.sheet_name = analysis.sheet_name
+            job.total_rows = analysis.total_rows
+            job.valid_rows = analysis.valid_rows
+            job.warning_rows = analysis.warning_rows
+            job.error_rows = analysis.error_rows
+            job.preview_data = json.dumps(payload, ensure_ascii=False)
+            job.status = "PREVIEW_READY"
+            self.db.add(job)
+            self.db.commit()
+        except Exception as exc:
+            logger.exception("[LONG_CHAU_IMPORT] preview persistence failed")
+            msg = f"Lỗi khi lưu preview: {exc}"
+            self._fail(job, msg)
+            return {"success": False, "importId": job.id, "status": "FAILED", "error_message": msg}
+
+        logger.info(
+            "[LONG_CHAU_IMPORT] preview file=%s sheet=%s total=%d valid=%d warning=%d error=%d",
+            filename, analysis.sheet_name, analysis.total_rows, analysis.valid_rows,
+            analysis.warning_rows, analysis.error_rows,
+        )
+        return self._build_preview_response(job, analysis, len(payload), already_imported)
+
+    def _build_preview_response(self, job: LongChauImportJob, analysis: ImportAnalysis,
+                                committable: int, already_imported: int) -> Dict[str, Any]:
+        mapper = self.importer.mapper
+        preview_rows = []
+        for r in analysis.rows[:MAX_PREVIEW_ROWS]:
+            item = mapper.to_preview(r.mapped)
+            item["status"] = r.status
+            item["duplicateOf"] = r.duplicate_of
+            item["issues"] = r.validation.errors + r.validation.warnings
+            preview_rows.append(item)
+
+        hm = analysis.header_mapping
+        return {
+            "success": True,
+            "importId": job.id,
+            "status": job.status,
+            "chain": CHAIN_LONG_CHAU,
+            "fileName": analysis.file_name,
+            "fileFormat": analysis.file_format,
+            "sheetName": analysis.sheet_name,
+            "availableSheets": analysis.available_sheets,
+            "headerRowNumber": analysis.header_row_number,
+            "totalRows": analysis.total_rows,
+            "validRows": analysis.valid_rows,
+            "warningRows": analysis.warning_rows,
+            "errorRows": analysis.error_rows,
+            "committableRows": committable,
+            "duplicateInFileRows": analysis.duplicate_in_file_rows,
+            "alreadyImportedRows": already_imported,
+            "headers": analysis.headers,
+            "columnMapping": hm.column_mapping,
+            "missingOptionalColumns": hm.missing_optional,
+            "unknownColumns": hm.unknown_headers,
+            "previewRows": preview_rows,
+            "previewTruncated": analysis.total_rows > MAX_PREVIEW_ROWS,
+            "validationErrors": analysis.validation_errors,
+            "warnings": analysis.warnings,
+        }
+
+    # ------------------------------------------------------------------ commit
+    def commit(self, import_id: str) -> Dict[str, Any]:
+        job = self._get_job(import_id)
+        if not job:
+            return {"success": False, "error_message": "Không tìm thấy phiên import LongChâu."}
+        if job.status != "PREVIEW_READY":
+            return {"success": False, "error_message": f"Không thể commit phiên import ở trạng thái {job.status}"}
+
+        job.status = "COMMITTING"
+        self.db.add(job)
+        self.db.commit()
+
+        try:
+            payload = json.loads(job.preview_data) if job.preview_data else []
+            existing = self._existing_keys([p["dedup_key"] for p in payload])
+
+            committed_at = _utcnow()
+            seen: Set[str] = set()
+            records: List[TicketRecord] = []
+            details: List[LongChauTicketDetail] = []
+            duplicate_count = 0
+            for p in payload:
+                key = p["dedup_key"]
+                if key in existing or key in seen:
+                    duplicate_count += 1
+                    continue
+                seen.add(key)
+
+                rec_data = dict(p["record"])
+                rec_data["chain"] = CHAIN_LONG_CHAU  # enforce, regardless of stored payload
+                rec_data["imported_at"] = committed_at
+                record = TicketRecord(**rec_data)
+                records.append(record)
+
+                d = p["detail"]
+                details.append(LongChauTicketDetail(
+                    ticket_record_id=record.id,
+                    chain=CHAIN_LONG_CHAU,
+                    ticket_id=record.ticket_id,
+                    dedup_key=key,
+                    request_group=d.get("request_group"),
+                    requester=d.get("requester"),
+                    handler_department=d.get("handler_department"),
+                    approver=d.get("approver"),
+                    expected_completion_date=date.fromisoformat(d["expected_completion_date"]) if d.get("expected_completion_date") else None,
+                    step=d.get("step"),
+                    region=d.get("region"),
+                    asm=d.get("asm"),
+                    camera_count=d.get("camera_count"),
+                    evidence_urls=d.get("evidence_urls"),
+                    employee_raw=d.get("employee_raw"),
+                    requested_date=date.fromisoformat(d["requested_date"]) if d.get("requested_date") else None,
+                    step_status=d.get("step_status"),
+                    import_id=job.id,
+                    source_row=d.get("source_row"),
+                ))
+
+            self.ticket_repo.insert_many(records)
+            if details:
+                self.db.add_all(details)
+                self.db.flush()
+
+            job.new_rows = len(records)
+            job.duplicate_rows = duplicate_count
+            job.status = "COMPLETED"
+            job.committed_at = committed_at
+            job.preview_data = None
+            self.db.add(job)
+            self.db.commit()
+        except IntegrityError:
+            logger.exception("[LONG_CHAU_IMPORT] duplicate detected at DB level")
+            self._fail(job, "Phát hiện bản ghi trùng lặp khi ghi dữ liệu (có thể do import đồng thời). Vui lòng thử lại.")
+            return {"success": False, "importId": import_id, "error_message": "Phát hiện bản ghi trùng lặp khi ghi dữ liệu."}
+        except Exception as exc:
+            logger.exception("[LONG_CHAU_IMPORT] commit failed")
+            self._fail(job, str(exc))
+            return {"success": False, "importId": import_id, "error_message": str(exc)}
+
+        logger.info(
+            "[LONG_CHAU_IMPORT] commit import_id=%s inserted=%d duplicates=%d",
+            import_id, job.new_rows, job.duplicate_rows,
+        )
+        return {
+            "success": True,
+            "importId": job.id,
+            "chain": CHAIN_LONG_CHAU,
+            "fileName": job.filename,
+            "status": job.status,
+            "summary": {
+                "totalRows": job.total_rows,
+                "committable": len(payload),
+                "inserted": job.new_rows,
+                "duplicates": job.duplicate_rows,
+                "warningRows": job.warning_rows,
+                "errorRows": job.error_rows,
+            },
+        }
+
+    # ----------------------------------------------------------------- history
+    def history(self, limit: int = 100) -> List[Dict[str, Any]]:
+        jobs = (
+            self.db.query(LongChauImportJob)
+            .order_by(LongChauImportJob.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+        return [
+            {
+                "importId": j.id,
+                "chain": j.chain,
+                "fileName": j.filename,
+                "fileFormat": j.file_format,
+                "sheetName": j.sheet_name,
+                "createdAt": j.created_at.isoformat() if j.created_at else None,
+                "committedAt": j.committed_at.isoformat() if j.committed_at else None,
+                "status": j.status,
+                "totalRows": j.total_rows or 0,
+                "validRows": j.valid_rows or 0,
+                "warningRows": j.warning_rows or 0,
+                "errorRows": j.error_rows or 0,
+                "successRows": j.new_rows or 0,
+                "duplicateRows": j.duplicate_rows or 0,
+                "errorMessage": j.error_message,
+            }
+            for j in jobs
+        ]

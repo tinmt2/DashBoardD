@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <defs>
+    <linearGradient id="db2-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <linearGradient id="db2-border" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#10b981" />
+    </linearGradient>
+    <linearGradient id="bar-fpt" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#1d4ed8" />
+      <stop offset="100%" stop-color="#38bdf8" />
+    </linearGradient>
+    <linearGradient id="bar-lc" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#34d399" />
+    </linearGradient>
+    <linearGradient id="bar-vac" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#7c3aed" />
+      <stop offset="100%" stop-color="#c084fc" />
+    </linearGradient>
+    <filter id="db2-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.5" />
+    </filter>
+  </defs>
+
+  <rect x="2.5" y="2.5" width="59" height="59" rx="15" fill="url(#db2-bg)" stroke="url(#db2-border)" stroke-width="1.8" />
+
+  <g filter="url(#db2-shadow)">
+    <!-- Aerodynamic D Outline -->
+    <path 
+      d="M19 15 H34 C46 15 52 22 52 32 C52 42 46 49 34 49 H19 C17.3 49 16 47.7 16 46 V18 C16 16.3 17.3 15 19 15 Z" 
+      stroke="url(#db2-border)" 
+      stroke-width="3" 
+      stroke-linejoin="round"
+      fill="rgba(15, 23, 42, 0.4)"
+    />
+    <!-- 3 Data Telemetry Bars representing FRT Chains -->
+    <!-- FPT Shop Bar (Blue) -->
+    <rect x="23" y="31" width="5" height="13" rx="2.5" fill="url(#bar-fpt)" />
+    <!-- Long Chau Bar (Emerald) -->
+    <rect x="31" y="23" width="5" height="21" rx="2.5" fill="url(#bar-lc)" />
+    <!-- Vaccine Bar (Purple) -->
+    <rect x="39" y="27" width="5" height="17" rx="2.5" fill="url(#bar-vac)" />
+  </g>
+</svg>

@@ -4,14 +4,15 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { 
   Activity, LayoutDashboard, Map, Users, ShieldAlert, Settings, Bell, Palette, 
   Save, X, Store, Pill, ShieldPlus, BarChart3, Users2, ChevronLeft, ChevronRight,
-  CheckCircle2, AlertCircle, Eye, EyeOff
+  CheckCircle2, AlertCircle, Eye, EyeOff, Menu, RefreshCw
 } from 'lucide-react';
 import TitleBar from './TitleBar';
 import { getFptShopAuthStatus, startFptShopAuth } from '../../services/fptShopApi';
 import { useNotification } from '../../context/NotificationContext';
 import { useSync } from '../../context/SyncContext';
-import { RealtimeSyncBanner } from '../common/CircularSpinner';
+import { RealtimeSyncBanner, CircularSpinner } from '../common/CircularSpinner';
 import NotificationPanel from './NotificationPanel';
+import BrandLogo from '../common/BrandLogo';
 
 export interface SidebarContextType {
   isCollapsed: boolean;
@@ -27,10 +28,11 @@ export const useSidebar = () => React.useContext(SidebarContext);
 
 const Layout: React.FC = () => {
   const { unreadCount, togglePanel } = useNotification();
-  const { isSyncing, syncStepText, syncDuration, syncToast, setSyncToast } = useSync();
+  const { isSyncing, syncStepText, syncDuration, syncToast, setSyncToast, syncAll, syncChain } = useSync();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [fptCreds, setFptCreds] = useState({ username: '', password: '' });
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem('sidebar_collapsed') === 'true';
@@ -118,7 +120,33 @@ const Layout: React.FC = () => {
 
   const location = useLocation();
 
-  // Active state styling for navigation links
+  useEffect(() => {
+    setIsMobileOpen(false);
+  }, [location.pathname]);
+
+  const getPageTitle = () => {
+    const path = location.pathname;
+    if (path === '/' || path === '/dashboard') return 'Tổng quan';
+    if (path.includes('fpt-shop')) return 'FPT Shop';
+    if (path.includes('long-chau')) return 'Long Châu';
+    if (path.includes('vaccine')) return 'Vaccine';
+    if (path.includes('employees')) return 'Quản lý nhân viên';
+    if (path.includes('analytics')) return 'Analytics';
+    return 'DashBoardD';
+  };
+
+  const handleMobileSync = () => {
+    const path = location.pathname;
+    if (path.includes('fpt-shop')) {
+      syncChain('FPT Shop');
+    } else if (path.includes('long-chau')) {
+      syncChain('Long Châu');
+    } else if (path.includes('vaccine')) {
+      syncChain('Vaccine');
+    } else {
+      syncAll();
+    }
+  };
   // Active and hover styling for navigation links with per-chain theme accents
   const getNavItemClass = (isActive: boolean, theme: 'indigo' | 'rose' | 'blue' | 'teal' | 'violet') => {
     const activeThemes = {
@@ -177,19 +205,45 @@ const Layout: React.FC = () => {
 
         <div className="flex flex-1 overflow-hidden relative z-10">
           
+          {/* Mobile Backdrop Overlay */}
+          {isMobileOpen && (
+            <div 
+              className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-40 md:hidden animate-fade-in"
+              onClick={() => setIsMobileOpen(false)}
+            />
+          )}
+
           {/* === Sidebar Navigation === */}
           <aside 
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
-            className={`${
-              effectiveCollapsed ? 'w-[74px] px-2 py-3.5' : 'w-[252px] p-3.5'
-            } shrink-0 bg-white/75 backdrop-blur-2xl border-r border-slate-200/60 ${
-              isHovered && isCollapsed ? 'shadow-[8px_0_32px_rgba(0,0,0,0.08)]' : 'shadow-[4px_0_24px_rgba(0,0,0,0.02)]'
-            } flex flex-col justify-between z-50 transition-[width,padding,box-shadow] duration-300 ease-in-out select-none relative`}
+            className={`
+              fixed inset-y-0 left-0 z-50 w-[270px] p-3.5 bg-white/95 backdrop-blur-2xl shadow-2xl transition-transform duration-300 ease-in-out select-none flex flex-col justify-between
+              ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
+              md:relative md:inset-auto md:translate-x-0 md:bg-white/75 md:backdrop-blur-2xl md:border-r md:border-slate-200/60 md:shrink-0
+              ${effectiveCollapsed ? 'md:w-[74px] md:px-2 md:py-3.5' : 'md:w-[252px] md:p-3.5'}
+              ${isHovered && isCollapsed ? 'md:shadow-[8px_0_32px_rgba(0,0,0,0.08)]' : 'md:shadow-[4px_0_24px_rgba(0,0,0,0.02)]'}
+            `}
           >
             <div className="flex flex-col gap-1.5">
-              {/* Modern Inset Toggle Switch (Aligned to the left - sát bên trái) */}
-              <div className={`flex items-center pb-2.5 pt-0.5 border-b border-slate-200/60 w-full transition-all ${
+              {/* Mobile Drawer Header with Close Button */}
+              <div className="flex items-center justify-between pb-3 pt-1 border-b border-slate-200/60 md:hidden">
+                <div className="flex items-center gap-2 pl-1">
+                  <BrandLogo size={24} className="rounded-md shadow-2xs shrink-0" />
+                  <span className="font-bold text-slate-800 text-[15px]">DashBoardD</span>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setIsMobileOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                  aria-label="Đóng menu"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Modern Inset Toggle Switch (Aligned to the left - sát bên trái, Desktop only) */}
+              <div className={`hidden md:flex items-center pb-2.5 pt-0.5 border-b border-slate-200/60 w-full transition-all ${
                 effectiveCollapsed ? 'justify-center' : 'justify-start pl-1'
               }`}>
                 <button
@@ -405,8 +459,72 @@ const Layout: React.FC = () => {
         {/* === Main Content Area === */}
         <div className="flex-1 flex flex-col min-w-0 relative z-10 overflow-hidden">
           
-          {/* Minimal Top Header for page actions */}
-          <header className="absolute top-0 right-0 w-full flex items-center justify-end p-8 z-40 pointer-events-none">
+          {/* Mobile Top Header (Visible on screens < md) */}
+          <header className="md:hidden h-14 px-4 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 flex items-center justify-between shrink-0 z-30">
+            <div className="flex items-center gap-2.5">
+              <button 
+                type="button" 
+                onClick={() => setIsMobileOpen(true)}
+                className="p-2 -ml-1 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100 active:scale-95 transition-all cursor-pointer"
+                title="Mở menu điều hướng"
+                aria-label="Mở menu điều hướng"
+              >
+                <Menu size={20} strokeWidth={2.4} />
+              </button>
+              <div className="flex items-center gap-2">
+                <BrandLogo size={22} className="rounded-md shadow-2xs shrink-0" />
+                <span className="font-bold text-[15px] text-slate-800 tracking-tight">{getPageTitle()}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1">
+              {/* Quick Sync Button on Mobile Header */}
+              <button 
+                type="button" 
+                onClick={handleMobileSync} 
+                disabled={isSyncing}
+                className={`p-2 rounded-xl transition-all cursor-pointer ${
+                  isSyncing 
+                    ? "bg-slate-900 text-emerald-400 ring-2 ring-emerald-500/20" 
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:scale-95"
+                }`}
+                title={isSyncing ? `${syncStepText} (${syncDuration}s)` : "Đồng bộ dữ liệu"}
+                aria-label="Đồng bộ dữ liệu"
+              >
+                {isSyncing ? (
+                  <div className="flex items-center gap-1 px-1">
+                    <CircularSpinner size={15} className="text-emerald-400 shrink-0" />
+                    <span className="text-[10.5px] font-bold tabular-nums text-emerald-400">{syncDuration}s</span>
+                  </div>
+                ) : (
+                  <RefreshCw size={17} strokeWidth={2.3} />
+                )}
+              </button>
+
+              <button 
+                type="button" 
+                onClick={togglePanel} 
+                className="relative p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Thông báo"
+              >
+                <Bell size={18} />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white"></span>
+                )}
+              </button>
+              <button 
+                type="button"
+                onClick={() => setIsSettingsOpen(true)}
+                className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Inside"
+              >
+                <Settings size={18} />
+              </button>
+            </div>
+          </header>
+
+          {/* Minimal Top Header for page actions on desktop */}
+          <header className="hidden md:flex absolute top-0 right-0 w-full items-center justify-end p-8 z-40 pointer-events-none">
             <div id="topbar-actions" className="flex items-center gap-2 pointer-events-auto"></div>
           </header>
 

@@ -121,11 +121,11 @@ const Employees: React.FC = () => {
   };
 
   return (
-    <div className="w-full px-8 lg:px-12 py-10 pb-16 relative z-10 animate-fade-in text-slate-800">
+    <div className="w-full px-3.5 sm:px-6 lg:px-12 py-4 sm:py-8 lg:py-10 pb-16 relative z-10 animate-fade-in text-slate-800">
       
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-[28px] font-bold text-slate-900 tracking-tight">Quản lý nhân viên</h1>
+          <h1 className="text-[24px] sm:text-[28px] font-bold text-slate-900 tracking-tight">Quản lý nhân viên</h1>
         </div>
         <button 
           onClick={() => setIsAddModalOpen(true)}
@@ -138,17 +138,17 @@ const Employees: React.FC = () => {
 
       {/* Metrics (Combined Bento Grid - Compact) */}
       <div className="w-full max-w-[580px]">
-        <GlassCard className="flex items-center justify-between p-5 relative overflow-hidden mb-6 bg-white/60 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-200/60 rounded-2xl">
+        <GlassCard className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 relative overflow-hidden mb-6 bg-white/60 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-200/60 rounded-2xl">
           {/* Left: Hero Metric */}
           <div className="relative z-10 pl-2">
             <div className="mb-2">
               <span className="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Tổng nhân sự</span>
             </div>
-            <div className="text-[54px] font-black text-slate-800 leading-none tracking-tight">{metrics.total}</div>
+            <div className="text-[44px] sm:text-[54px] font-black text-slate-800 leading-none tracking-tight">{metrics.total}</div>
           </div>
 
           {/* Right: Sub metrics */}
-          <div className="relative z-10 w-[240px] flex flex-col gap-2">
+          <div className="relative z-10 w-full sm:w-[240px] flex flex-col gap-2">
             <div className="bg-white/80 backdrop-blur-md border border-slate-200/60 px-3.5 py-2 rounded-xl flex justify-between items-center shadow-2xs">
               <span className="text-[11.5px] font-bold text-slate-500 uppercase tracking-wider">FPT Shop</span>
               <span className="text-[16px] font-bold text-slate-800 leading-none">{metrics.fpt}</span>

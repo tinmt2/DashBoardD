@@ -184,10 +184,10 @@ export const LucianDateRangePicker: React.FC<LucianDateRangePickerProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`${positionClasses} z-[100] w-[340px] bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.18),0_0_0_1px_rgba(0,0,0,0.08)] p-4 flex flex-col select-none animate-fade-in text-slate-800`}
+      className={`fixed inset-x-3 top-20 sm:static sm:inset-auto ${positionClasses} z-[100] w-auto sm:w-[340px] max-w-[95vw] mx-auto sm:mx-0 bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.22),0_0_0_1px_rgba(0,0,0,0.08)] p-4 flex flex-col select-none animate-fade-in text-slate-800`}
     >
-      {/* Arrow pointer connecting to sidebar trigger */}
-      <div className="absolute -left-1.5 top-5 w-3.5 h-3.5 bg-white border-l border-t border-slate-200/80 -rotate-45 pointer-events-none rounded-tl-xs shadow-[-3px_-3px_5px_rgba(0,0,0,0.02)]" />
+      {/* Arrow pointer connecting to sidebar trigger (desktop only) */}
+      <div className="hidden sm:block absolute -left-1.5 top-5 w-3.5 h-3.5 bg-white border-l border-t border-slate-200/80 -rotate-45 pointer-events-none rounded-tl-xs shadow-[-3px_-3px_5px_rgba(0,0,0,0.02)]" />
 
       {/* Top Header */}
       <div className="flex items-center justify-between pb-3 border-b border-slate-100">

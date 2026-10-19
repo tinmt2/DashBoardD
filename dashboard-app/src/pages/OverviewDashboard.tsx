@@ -202,7 +202,7 @@ const OverviewDashboard: React.FC = () => {
   };
 
   return (
-    <div className="p-8 max-w-[1700px] mx-auto h-full flex flex-col bg-[#f8fbff]/50">
+    <div className="p-3.5 sm:p-6 lg:p-8 max-w-[1700px] mx-auto h-full flex flex-col bg-[#f8fbff]/50">
       
       {/* DatePicker & SyncAll button portaled to Sidebar Actions */}
       {mounted && document.getElementById('sidebar-actions') && createPortal(

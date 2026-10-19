@@ -50,17 +50,17 @@ export function RealtimeSyncBanner({ isSyncing, statusText, duration }: Realtime
   if (!isSyncing) return null;
 
   return (
-    <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[9990] pointer-events-none animate-in fade-in slide-in-from-top-3 duration-300">
-      <div className="bg-slate-900/95 text-white backdrop-blur-md rounded-full px-4 py-2 border border-slate-700/80 shadow-[0_10px_35px_rgba(0,0,0,0.3)] flex items-center gap-3">
-        <div className="relative flex items-center justify-center">
+    <div className="fixed top-16 md:top-5 left-1/2 -translate-x-1/2 z-[9990] pointer-events-none animate-in fade-in slide-in-from-top-3 duration-300 max-w-[92vw]">
+      <div className="bg-slate-900/95 text-white backdrop-blur-md rounded-full px-4 py-2 border border-slate-700/80 shadow-[0_10px_35px_rgba(0,0,0,0.3)] flex items-center gap-2.5 sm:gap-3">
+        <div className="relative flex items-center justify-center shrink-0">
           <CircularSpinner size={16} className="text-emerald-400" />
           <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
         </div>
-        <span className="text-[12.5px] font-semibold text-slate-100 tracking-tight">
+        <span className="text-[12px] sm:text-[12.5px] font-semibold text-slate-100 tracking-tight truncate max-w-[200px] sm:max-w-none">
           {statusText || 'Đang tải dữ liệu...'}
         </span>
-        <div className="flex items-center bg-slate-800/90 text-emerald-400 px-2.5 py-0.5 rounded-full border border-slate-700/60">
-          <span className="text-[11.5px] font-bold tabular-nums">{duration}s</span>
+        <div className="flex items-center bg-slate-800/90 text-emerald-400 px-2 sm:px-2.5 py-0.5 rounded-full border border-slate-700/60 shrink-0">
+          <span className="text-[11px] sm:text-[11.5px] font-bold tabular-nums">{duration}s</span>
         </div>
       </div>
     </div>

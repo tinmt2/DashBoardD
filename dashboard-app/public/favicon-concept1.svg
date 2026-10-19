@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <defs>
+    <linearGradient id="db1-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0e1a" />
+      <stop offset="100%" stop-color="#18153b" />
+    </linearGradient>
+    <linearGradient id="db1-border" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.85" />
+      <stop offset="50%" stop-color="#818cf8" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#c084fc" stop-opacity="0.85" />
+    </linearGradient>
+    <linearGradient id="db1-stem" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#6366f1" />
+    </linearGradient>
+    <linearGradient id="db1-loop" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00f2fe" />
+      <stop offset="35%" stop-color="#38bdf8" />
+      <stop offset="70%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#a855f7" />
+    </linearGradient>
+    <radialGradient id="db1-pulse" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#34d399" />
+      <stop offset="100%" stop-color="#059669" />
+    </radialGradient>
+    <filter id="db1-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000" flood-opacity="0.6" />
+    </filter>
+  </defs>
+
+  <!-- High-contrast dark squircle tile (crisp on both white and dark browser tabs) -->
+  <rect x="2.5" y="2.5" width="59" height="59" rx="15" fill="url(#db1-bg)" stroke="url(#db1-border)" stroke-width="1.8" />
+
+  <!-- D Monogram Structure -->
+  <g filter="url(#db1-shadow)">
+    <!-- Outer Arc of D -->
+    <path 
+      d="M26 16 H36 C46.5 16 53 23 53 32 C53 41 46.5 48 36 48 H26" 
+      stroke="url(#db1-loop)" 
+      stroke-width="6.8" 
+      stroke-linecap="round" 
+      stroke-linejoin="round"
+    />
+    <!-- Vertical Spine of D -->
+    <path 
+      d="M20 16 V48" 
+      stroke="url(#db1-stem)" 
+      stroke-width="6.8" 
+      stroke-linecap="round"
+    />
+    <!-- Realtime Pulse Radar Core -->
+    <circle cx="36" cy="32" r="3.6" fill="url(#db1-pulse)" />
+    <circle cx="36" cy="32" r="6.6" stroke="#34d399" stroke-width="1.2" stroke-opacity="0.75" stroke-dasharray="2 2" />
+  </g>
+</svg>

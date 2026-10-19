@@ -715,10 +715,10 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
         document.getElementById('sidebar-footer-time')!
       )}
 
-      <div className="flex-1 overflow-y-auto px-8 lg:px-12 py-10 relative z-10 w-full animate-fade-in space-y-6">
+      <div className="flex-1 overflow-y-auto px-3.5 sm:px-6 lg:px-12 py-4 sm:py-8 lg:py-10 relative z-10 w-full animate-fade-in space-y-6">
 
         {/* Top Section */}
-        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-8 mb-8 w-full">
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 md:gap-8 mb-4 md:mb-8 w-full">
 
           {/* Connect, Import, Sync & DatePicker buttons portaled to Sidebar Header */}
           {mounted && document.getElementById('sidebar-actions') && createPortal(
@@ -878,66 +878,66 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
 
           {!isDataEmpty && (
 
-             <GlassCard className="flex-1 flex flex-col md:flex-row items-stretch p-4 md:py-2 relative overflow-hidden bg-white/60 divide-y md:divide-y-0 md:divide-x divide-slate-200/60 shadow-[0_2px_12px_rgba(0,0,0,0.03)] w-full m-0">
+             <GlassCard className="flex-1 grid grid-cols-2 lg:flex lg:flex-row items-stretch p-3.5 md:p-4 md:py-2 relative overflow-hidden bg-white/60 gap-3 md:gap-0 lg:divide-x divide-slate-200/60 shadow-[0_2px_12px_rgba(0,0,0,0.03)] w-full m-0">
                 <>
-                    <div className="flex-1 px-2 md:px-8 py-4 md:py-0 flex flex-col justify-center relative">
-                      <div className="flex items-center gap-3 mb-3 relative z-10">
-                        <span className="text-[14px] font-bold text-slate-500 uppercase tracking-widest">{chain === 'Long Châu' || chain === 'Vaccine' ? 'Tổng Ticket' : 'Tổng Callog'}</span>
+                    <div className="flex-1 px-2 md:px-8 py-2 md:py-0 flex flex-col justify-center relative">
+                      <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3 relative z-10">
+                        <span className="text-[12px] sm:text-[13px] md:text-[14px] font-bold text-slate-500 uppercase tracking-wider">{chain === 'Long Châu' || chain === 'Vaccine' ? 'Tổng Ticket' : 'Tổng Callog'}</span>
                       </div>
-                      <div className="text-[48px] font-semibold text-slate-700 leading-none tracking-tight relative z-10">
+                      <div className="text-[28px] sm:text-[38px] xl:text-[48px] font-semibold text-slate-700 leading-none tracking-tight relative z-10">
                         <AnimatedNumber value={Number(chain === 'Long Châu' || chain?.includes('Long') ? kpiData.checked : kpiData.total) || 0} />
                       </div>
                     </div>
                     {ticketStatusStats.some(s => s.status.toLowerCase().includes('chờ') || s.status.toLowerCase().includes('cho')) && (
-                      <div className="flex-1 px-2 md:px-8 py-4 md:py-0 flex flex-col justify-center relative">
-                        <div className="flex items-center gap-3 mb-3 relative z-10">
-                          <span className="text-[14px] font-bold text-slate-500 uppercase tracking-widest">Chờ xử lý</span>
+                      <div className="flex-1 px-2 md:px-8 py-2 md:py-0 flex flex-col justify-center relative">
+                        <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3 relative z-10">
+                          <span className="text-[12px] sm:text-[13px] md:text-[14px] font-bold text-slate-500 uppercase tracking-wider">Chờ xử lý</span>
                         </div>
-                        <div className="text-[48px] font-semibold text-slate-700 leading-none tracking-tight relative z-10">
+                        <div className="text-[28px] sm:text-[38px] xl:text-[48px] font-semibold text-slate-700 leading-none tracking-tight relative z-10">
                           <AnimatedNumber value={Number(ticketStatusStats.find(s => s.status.toLowerCase().includes('chờ') || s.status.toLowerCase().includes('cho'))?.count || 0)} />
                         </div>
                       </div>
                     )}
-                    <div className="flex-1 px-2 md:px-8 py-4 md:py-0 flex flex-col justify-center relative">
-                      <div className="flex items-center gap-3 mb-3 relative z-10">
-                        <span className="text-[14px] font-bold text-slate-500 uppercase tracking-widest">Đang xử lý</span>
+                    <div className="flex-1 px-2 md:px-8 py-2 md:py-0 flex flex-col justify-center relative">
+                      <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3 relative z-10">
+                        <span className="text-[12px] sm:text-[13px] md:text-[14px] font-bold text-slate-500 uppercase tracking-wider">Đang xử lý</span>
                       </div>
-                      <div className="text-[48px] font-semibold text-slate-700 leading-none tracking-tight relative z-10">
+                      <div className="text-[28px] sm:text-[38px] xl:text-[48px] font-semibold text-slate-700 leading-none tracking-tight relative z-10">
                         <AnimatedNumber value={Number(ticketStatusStats.find(s => (s.status.toLowerCase().includes('đang') || s.status.toLowerCase().includes('dang')) && !s.status.toLowerCase().includes('chờ'))?.count || 0)} />
                       </div>
                     </div>
-                    <div className="flex-1 px-2 md:px-8 py-4 md:py-0 flex flex-col justify-center relative">
-                      <div className="flex items-center gap-3 mb-3 relative z-10">
-                        <span className="text-[14px] font-bold text-slate-500 uppercase tracking-widest">Hoàn tất</span>
+                    <div className="flex-1 px-2 md:px-8 py-2 md:py-0 flex flex-col justify-center relative">
+                      <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3 relative z-10">
+                        <span className="text-[12px] sm:text-[13px] md:text-[14px] font-bold text-slate-500 uppercase tracking-wider">Hoàn tất</span>
                       </div>
-                      <div className="text-[48px] font-semibold text-slate-700 leading-none tracking-tight relative z-10">
+                      <div className="text-[28px] sm:text-[38px] xl:text-[48px] font-semibold text-slate-700 leading-none tracking-tight relative z-10">
                         <AnimatedNumber value={Number(ticketStatusStats.find(s => s.status.toLowerCase().includes('hoàn tất') || s.status.toLowerCase().includes('hoan tat'))?.count || 0)} />
                       </div>
                     </div>
                     {chain === 'Vaccine' ? (
                       <div 
-                        className="flex-1 px-2 md:px-8 py-4 md:py-0 flex flex-col justify-center relative cursor-default"
+                        className="flex-1 px-2 md:px-8 py-2 md:py-0 flex flex-col justify-center relative cursor-default"
                         title={`Tổng kết (Cột Y): ${kpiData.nonPenalty} Không phạt • ${kpiData.penalty} Phạt`}
                       >
-                        <div className="flex items-center gap-3 mb-3 relative z-10">
-                          <span className="text-[14px] font-bold text-slate-500 uppercase tracking-widest">Không phạt / Phạt</span>
+                        <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3 relative z-10">
+                          <span className="text-[12px] sm:text-[13px] md:text-[14px] font-bold text-slate-500 uppercase tracking-wider">Không phạt / Phạt</span>
                         </div>
-                        <div className="text-[36px] xl:text-[44px] font-semibold text-slate-700 leading-none tracking-tight relative z-10 flex items-baseline">
+                        <div className="text-[24px] sm:text-[32px] xl:text-[44px] font-semibold text-slate-700 leading-none tracking-tight relative z-10 flex items-baseline">
                           <span className="text-emerald-600">
                             <AnimatedNumber value={Number(kpiData.nonPenalty || 0)} />
                           </span>
-                          <span className="text-slate-300 font-light text-[24px] xl:text-[30px] mx-1.5 select-none">/</span>
+                          <span className="text-slate-300 font-light text-[20px] xl:text-[30px] mx-1.5 select-none">/</span>
                           <span className="text-slate-600">
                             <AnimatedNumber value={Number(kpiData.penalty || 0)} />
                           </span>
                         </div>
                       </div>
                     ) : (
-                      <div className="flex-1 px-2 md:px-8 py-4 md:py-0 flex flex-col justify-center relative">
-                        <div className="flex items-center gap-3 mb-3 relative z-10">
-                          <span className="text-[14px] font-bold text-slate-500 uppercase tracking-widest">Nhắc nhở</span>
+                      <div className="flex-1 px-2 md:px-8 py-2 md:py-0 flex flex-col justify-center relative">
+                        <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3 relative z-10">
+                          <span className="text-[12px] sm:text-[13px] md:text-[14px] font-bold text-slate-500 uppercase tracking-wider">Nhắc nhở</span>
                         </div>
-                        <div className="text-[48px] font-semibold text-slate-700 leading-none tracking-tight relative z-10">
+                        <div className="text-[28px] sm:text-[38px] xl:text-[48px] font-semibold text-slate-700 leading-none tracking-tight relative z-10">
                           <AnimatedNumber value={Number(kpiData.reminders || 0)} />
                         </div>
                       </div>
@@ -1012,7 +1012,7 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
 
             {/* Main Content Grid */}
 
-            <div className={`grid ${chain ? 'grid-cols-2' : 'grid-cols-3'} gap-6 pb-8 min-h-[400px]`}>
+            <div className={`grid grid-cols-1 ${chain ? 'lg:grid-cols-2' : 'lg:grid-cols-3'} gap-6 pb-8 min-h-[400px]`}>
 
               
 

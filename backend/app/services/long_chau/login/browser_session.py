@@ -88,23 +88,32 @@ class LongChauBrowserSession(BaseBrowserSession):
                         let providedUser = arguments[0];
                         let providedPass = arguments[1];
                         
-                        if (providedUser && providedPass && pwd && acc && (!pwd.value || !acc.value)) {
+                        if (providedUser && providedPass && pwd && acc) {
                             const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
                             
                             nativeInputValueSetter.call(acc, providedUser);
                             acc.dispatchEvent(new Event('input', { bubbles: true }));
+                            acc.dispatchEvent(new Event('change', { bubbles: true }));
                             
                             nativeInputValueSetter.call(pwd, providedPass);
                             pwd.dispatchEvent(new Event('input', { bubbles: true }));
+                            pwd.dispatchEvent(new Event('change', { bubbles: true }));
+                            
+                            let btn = document.querySelector('#kt_login_signin_submit') || document.querySelector('button[type="submit"]') || document.querySelector('.kt-login__btn-primary');
+                            if (btn && !window._lc_submitted) {
+                                window._lc_submitted = true;
+                                setTimeout(() => btn.click(), 400);
+                            }
                         }
                         """
                         user = self.temp_creds.get("username") if getattr(self, "temp_creds", None) else ""
                         pwd = self.temp_creds.get("password") if getattr(self, "temp_creds", None) else ""
-                        self.driver.execute_script(js, user, pwd)
+                        if user and pwd:
+                            self.driver.execute_script(js, user, pwd)
                     except: pass
 
                     page_source = self.driver.page_source.lower()
-                    if "otp" in page_source or "mã xác nhận" in page_source or "ma xac nhan" in page_source:
+                    if "vui lòng nhập mã otp" in page_source or "mã xác thực không hợp lệ" in page_source or "mã xác nhận không đúng" in page_source:
                         self.status = "OTP_REQUIRED"
                         try:
                             self.driver.maximize_window()

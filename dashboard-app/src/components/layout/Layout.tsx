@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import TitleBar from './TitleBar';
 import { getFptShopAuthStatus, startFptShopAuth } from '../../services/fptShopApi';
+import { startLongChauAuth } from '../../services/longChauApi';
+import { startVaccineAuth } from '../../services/vaccineApi';
 import { useNotification } from '../../context/NotificationContext';
 import { useSync } from '../../context/SyncContext';
 import { RealtimeSyncBanner, CircularSpinner } from '../common/CircularSpinner';
@@ -113,9 +115,20 @@ const Layout: React.FC = () => {
     }).catch(() => {});
   }, []);
 
+  useEffect(() => {
+    const handleOpenSettings = () => setIsSettingsOpen(true);
+    window.addEventListener('open-inside-settings', handleOpenSettings);
+    return () => window.removeEventListener('open-inside-settings', handleOpenSettings);
+  }, []);
+
   const saveSettings = () => {
     localStorage.setItem('fptCreds', JSON.stringify(fptCreds));
     setIsSettingsOpen(false);
+    if (fptCreds.username && fptCreds.password) {
+      startFptShopAuth(fptCreds).catch(() => {});
+      startLongChauAuth(fptCreds).catch(() => {});
+      startVaccineAuth(fptCreds).catch(() => {});
+    }
   };
 
   const location = useLocation();

@@ -79,10 +79,9 @@ class FPTBrowserSession(BaseBrowserSession):
         if not self.driver:
             return False
         url = self.driver.current_url.lower()
+        if "login" in url or "identity" in url:
+            return False
         if "calllog.fptshop.com.vn/report/debtconfirm" in url:
-            return True
-        if "identity.fptshop.com.vn" in url or "accounts.google.com" in url or "microsoftonline.com" in url:
-            # We are in the auth flow, do not redirect
             return True
         return False
 
@@ -102,7 +101,52 @@ class FPTBrowserSession(BaseBrowserSession):
             try:
                 url = self.driver.current_url.lower()
                 
-                if "calllog.fptshop.com.vn/report/debtconfirm" in url:
+                # Check if we are on a login / identity page first!
+                is_login = "users/login" in url or "identity.fptshop.com.vn" in url or "identity.frt.vn" in url or ("login" in url and "calllog.fptshop" in url) or "/account/login" in url
+                
+                if is_login:
+                    try:
+                        # ALWAYS Inject credentials and auto-submit if provided
+                        js = """
+                        let pwd = document.querySelector('input[name="LoginInput.Password"]') || document.querySelector('input[formcontrolname="password"]') || document.querySelector('input[type="password"]');
+                        let acc = document.querySelector('input[name="LoginInput.UserNameOrEmailAddress"]') || document.querySelector('input[formcontrolname="employee_code"]') || document.querySelector('input[name="UserName"]') || document.querySelector('input[type="text"]');
+                        
+                        let providedUser = arguments[0];
+                        let providedPass = arguments[1];
+                        
+                        if (providedUser && providedPass && pwd && acc) {
+                            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                            
+                            nativeInputValueSetter.call(acc, providedUser);
+                            acc.dispatchEvent(new Event('input', { bubbles: true }));
+                            acc.dispatchEvent(new Event('change', { bubbles: true }));
+                            
+                            nativeInputValueSetter.call(pwd, providedPass);
+                            pwd.dispatchEvent(new Event('input', { bubbles: true }));
+                            pwd.dispatchEvent(new Event('change', { bubbles: true }));
+                            
+                            let btn = document.querySelector('#kt_login_signin_submit') || document.querySelector('button[type="submit"]') || document.querySelector('.kt-login__btn-primary');
+                            if (btn && !window._fpt_submitted) {
+                                window._fpt_submitted = true;
+                                setTimeout(() => btn.click(), 400);
+                            }
+                        }
+                        """
+                        user = self.temp_creds.get("username") if getattr(self, "temp_creds", None) else ""
+                        pwd = self.temp_creds.get("password") if getattr(self, "temp_creds", None) else ""
+                        if user and pwd:
+                            self.driver.execute_script(js, user, pwd)
+                    except Exception as e:
+                        pass
+
+                    page_source = self.driver.page_source.lower()
+                    if "vui lòng nhập mã otp" in page_source or "mã xác thực không hợp lệ" in page_source or "mã xác nhận không đúng" in page_source:
+                        self.status = "OTP_REQUIRED"
+                        self._force_show_window()
+                    else:
+                        self.status = "LOGIN_PAGE"
+
+                elif "calllog.fptshop.com.vn/report/debtconfirm" in url and "login" not in url and "identity" not in url:
                     self.status = "AUTHENTICATED"
                     self._force_minimize_window()
                     
@@ -127,40 +171,6 @@ class FPTBrowserSession(BaseBrowserSession):
                     if not getattr(self, '_closing_thread_started', False) and not getattr(self, 'is_headless', False):
                         self._closing_thread_started = True
                         threading.Thread(target=switch_headless, daemon=True).start()
-                    
-                elif "identity.fptshop.com.vn" in url:
-                    try:
-                        # ALWAYS Inject credentials if provided on this domain!
-                        js = """
-                        let pwd = document.querySelector('input[name="LoginInput.Password"]') || document.querySelector('input[formcontrolname="password"]') || document.querySelector('input[type="password"]');
-                        let acc = document.querySelector('input[name="LoginInput.UserNameOrEmailAddress"]') || document.querySelector('input[formcontrolname="employee_code"]') || document.querySelector('input[name="UserName"]') || document.querySelector('input[type="text"]');
-                        
-                        let providedUser = arguments[0];
-                        let providedPass = arguments[1];
-                        
-                        if (providedUser && providedPass && pwd && acc && (!pwd.value || !acc.value)) {
-                            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-                            
-                            nativeInputValueSetter.call(acc, providedUser);
-                            acc.dispatchEvent(new Event('input', { bubbles: true }));
-                            
-                            nativeInputValueSetter.call(pwd, providedPass);
-                            pwd.dispatchEvent(new Event('input', { bubbles: true }));
-                        }
-                        """
-                        user = self.temp_creds.get("username") if getattr(self, "temp_creds", None) else ""
-                        pwd = self.temp_creds.get("password") if getattr(self, "temp_creds", None) else ""
-                        self.driver.execute_script(js, user, pwd)
-                    except Exception as e:
-                        pass
-
-                    # Then check for OTP required
-                    page_source = self.driver.page_source.lower()
-                    if "otp" in page_source or "mã xác nhận" in page_source or "authenticator" in page_source or "verification" in page_source:
-                        self.status = "OTP_REQUIRED"
-                        self._force_show_window()
-                    else:
-                        self.status = "LOGIN_PAGE"
 
                 elif "accounts.google.com" in url or "login.microsoftonline.com" in url:
                     self.status = "OTP_REQUIRED"

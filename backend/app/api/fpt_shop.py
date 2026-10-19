@@ -161,7 +161,7 @@ def sync_fpt_shop(req: SyncRequest, db: Session = Depends(get_db)):
     
     try:
         driver = session.driver
-        body = f"Type=Gi%C3%A1m+s%C3%A1t+h%C3%ACnh+%E1%BA%A3nh+Camera&stepNo=-1&requestId=&Type=&Region=&sender=&timeStart={req.start_date.strftime('%Y-%m-%d')}&timeEnd={req.end_date.strftime('%Y-%m-%d')}&month_giuluong_37=&year_giuluong_37=&RegionId=&OfficeId=&TypeId=150"
+        body = f"Type=Gi%C3%A1m+s%C3%A1t+h%C3%ACnh+%E1%BA%A3nh+Camera&stepNo=-1&requestId=&Type=&Region=&sender=&timeStart={req.start_date.strftime('%d/%m/%Y')}&timeEnd={req.end_date.strftime('%d/%m/%Y')}&month_giuluong_37=&year_giuluong_37=&RegionId=&OfficeId=&TypeId=150"
         
         logger.info(f"[FPT_SYNC] current_url={driver.current_url}")
         driver.set_script_timeout(60)
@@ -205,7 +205,12 @@ def sync_fpt_shop(req: SyncRequest, db: Session = Depends(get_db)):
         result = driver.execute_async_script(js_code, body)
         
         if result.get("status") != 200:
-            error_msg = f"Failed to download Excel. Status: {result.get('status')}"
+            status_code = result.get("status")
+            if status_code in (401, 403):
+                session.status = "LOGIN_PAGE"
+                error_msg = "Phiên làm việc FPT Shop chưa được xác thực hoặc đã hết hạn (Mã 403). Vui lòng bấm 'Đăng nhập FPT' để đăng nhập lại."
+            else:
+                error_msg = f"Failed to download Excel. Status: {status_code}"
             logger.error(f"[FPT_SYNC] {error_msg}")
             return SyncResponse(
                 success=False,

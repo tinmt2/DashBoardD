@@ -181,24 +181,26 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
 
   const handleStartAuth = useCallback(async () => {
     try {
+      let freshCreds = {username: '', password: ''};
+      try { const saved = localStorage.getItem('fptCreds'); if (saved) freshCreds = JSON.parse(saved); } catch(e){}
+
+      if (!freshCreds.username || !freshCreds.password) {
+        window.dispatchEvent(new CustomEvent('open-inside-settings'));
+        return;
+      }
+
       if (chain === 'Vaccine') {
         const s = { authenticated: false, status: 'STARTING' }; setVaccineAuth(s); cachedVacAuth = s;
-        let freshCreds = {username: '', password: ''};
-        try { const saved = localStorage.getItem('fptCreds'); if (saved) freshCreds = JSON.parse(saved); } catch(e){}
         const res = await startVaccineAuth(freshCreds);
         setVaccineAuth(res); cachedVacAuth = res;
         if (!res.authenticated) setIsVacPolling(true);
       } else if (chain?.includes('Long')) {
         const s = { authenticated: false, status: 'STARTING' }; setLongChauAuth(s); cachedLcAuth = s;
-        let freshCreds = {username: '', password: ''};
-        try { const saved = localStorage.getItem('fptCreds'); if (saved) freshCreds = JSON.parse(saved); } catch(e){}
         const res = await startLongChauAuth(freshCreds);
         setLongChauAuth(res); cachedLcAuth = res;
         if (!res.authenticated) setIsLcPolling(true);
       } else {
         const s2 = { authenticated: false, status: 'STARTING' }; setFptAuth(s2); cachedFptAuth = s2;
-        let freshCreds = {username: '', password: ''};
-        try { const saved = localStorage.getItem('fptCreds'); if (saved) freshCreds = JSON.parse(saved); } catch(e){}
         const res = await startFptShopAuth(freshCreds);
         setFptAuth(res); cachedFptAuth = res;
         if (!res.authenticated) setIsFptPolling(true);

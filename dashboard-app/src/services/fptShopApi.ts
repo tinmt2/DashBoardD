@@ -5,7 +5,7 @@ import {
     EmployeeErrorRanking 
 } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8000`;
+const API_BASE_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'file:' ? 'http://127.0.0.1:8000' : (window.location.port === '5174' ? `http://${window.location.hostname}:8000` : window.location.origin));
 
 export interface DashboardSummaryResponse {
     success: boolean;
@@ -128,6 +128,7 @@ export interface SyncResponse {
     file_name: string;
     total_rows: number;
     new_records: number;
+    updated_records?: number;
     duplicate_records: number;
     invalid_records: number;
     error_message?: string;
@@ -146,6 +147,10 @@ export const syncFptShop = async (data: SyncRequest, signal?: AbortSignal): Prom
         const err = await response.json().catch(() => ({}));
         throw new Error(err.detail || 'Failed to sync FPT Shop data');
     }
-    return response.json();
+    const result: SyncResponse = await response.json();
+    if (!result.success) {
+        throw new Error(result.error_message || 'Đồng bộ FPT Shop thất bại');
+    }
+    return result;
 };
 

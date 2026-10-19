@@ -1,4 +1,4 @@
-﻿from typing import List, Optional, Tuple, Dict, Any
+from typing import List, Optional, Tuple, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.models.ticket import Ticket
@@ -99,11 +99,13 @@ class SQLiteTicketRepository(TicketRepository):
             if not emp_id: continue
             if emp_id not in emp_status_map:
                 emp_status_map[emp_id] = {}
-            s_name = status if status else "KhÃ¡c"
+            s_name = status if status else "Khác"
             emp_status_map[emp_id][s_name] = count
 
-        total_reminders = scoped(self.db.query(func.count(Ticket.id))).filter(Ticket.note.ilike('%nhắc nhở%')).scalar() or 0
-        emp_reminders_query = scoped(self.db.query(Ticket.employee_id, func.count(Ticket.id))).filter(Ticket.note.ilike('%nhắc nhở%')).group_by(Ticket.employee_id).all()
+        from app.core.reminder import get_reminder_filter
+        reminder_condition = get_reminder_filter(Ticket.note)
+        total_reminders = scoped(self.db.query(func.count(Ticket.id))).filter(Ticket.note.isnot(None), reminder_condition).scalar() or 0
+        emp_reminders_query = scoped(self.db.query(Ticket.employee_id, func.count(Ticket.id))).filter(Ticket.note.isnot(None), reminder_condition).group_by(Ticket.employee_id).all()
         emp_reminders_map = {emp_id: count for emp_id, count in emp_reminders_query if emp_id}
 
         return {

@@ -47,7 +47,7 @@ class FPTShopSummaryService:
 
         error_type_stats = []
         for e_type, e_count, emps in data["error_types"]:
-            t_name = e_type if e_type else "KhÃ¡c"
+            t_name = e_type if e_type else "Khác"
             emps.sort(key=lambda x: x["count"], reverse=True)
             error_type_stats.append(CalllogErrorTypeStats(
                 type=t_name,
@@ -60,7 +60,7 @@ class FPTShopSummaryService:
 
         ticket_status_stats = []
         for s_type, s_count in data["ticket_statuses"]:
-            t_name = s_type if s_type else "KhÃ¡c"
+            t_name = s_type if s_type else "Khác"
             ticket_status_stats.append(TicketStatusStats(status=t_name, count=s_count))
         ticket_status_stats.sort(key=lambda x: x.count, reverse=True)
 

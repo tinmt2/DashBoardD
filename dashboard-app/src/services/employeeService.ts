@@ -10,10 +10,14 @@ if (!localStorage.getItem(STORAGE_KEY)) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(mockEmployees));
 }
 
+let memoryEmployees: Employee[] | null = null;
+
 const getStoredEmployees = (): Employee[] => {
+  if (memoryEmployees) return memoryEmployees;
   try {
     const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
+    memoryEmployees = data ? JSON.parse(data) : [];
+    return memoryEmployees || [];
   } catch (error) {
     console.error("Failed to parse stored employees", error);
     return [];
@@ -36,6 +40,7 @@ const addHistoryRecord = (record: EmployeeTransferHistory) => {
 };
 
 const saveEmployees = (employees: Employee[]) => {
+  memoryEmployees = employees;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(employees));
   // Dispatch a custom event to notify other modules of data changes
   window.dispatchEvent(new Event('employees_updated'));
@@ -43,7 +48,6 @@ const saveEmployees = (employees: Employee[]) => {
 
 export const DashboardService = {
   getSummary: async (chain?: Chain): Promise<DashboardSummary> => {
-    await delay(300);
     if (chain && chainSummaries[chain]) {
       return chainSummaries[chain].summary;
     }
@@ -51,14 +55,12 @@ export const DashboardService = {
   },
   
   getTrends: async (chain?: Chain): Promise<ErrorTrend[]> => {
-    await delay(400);
     return errorTrends;
   }
 };
 
 export const EmployeeService = {
   getEmployees: async (chain?: Chain): Promise<Employee[]> => {
-    await delay(200); // reduced delay for better UX
     const employees = getStoredEmployees();
     if (chain) {
       return employees.filter(e => e.chain === chain);

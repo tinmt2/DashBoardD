@@ -37,6 +37,9 @@ export interface VaccineDashboardSummary {
   employeeErrorRanking: EmployeeErrorRanking[];
   shopErrorRanking: ShopErrorRanking[];
   regionErrorStats: RegionErrorStat[];
+  nonPenaltyCount?: number;
+  penaltyCount?: number;
+  summaryStats?: Array<{ status: string; count: number }>;
 }
 
 export interface VaccineDashboardResponse {

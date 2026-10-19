@@ -10,13 +10,13 @@ class LongChauApiClient:
     TICKETS_TABLE_ID = "ta_906c3ea9f5ce4b218b9597bec3f77298"
     VIOLATIONS_TABLE_ID = "ta_034fc6b1ac194beeb949f8b7739d8a11"
 
-    def __init__(self, cookies: Dict[str, str]):
+    def __init__(self, cookies: Dict[str, str], headers: Optional[Dict[str, str]] = None):
         """
         Initialize with cookies from the authenticated browser session.
         Needs at least the 'budibase:currentapp' cookie.
         """
         self.cookies = cookies
-        self.headers = {
+        self.headers = headers or {
             "Accept": "application/json",
             "Content-Type": "application/json",
             "x-budibase-app-id": "frt-gscmr-long-chau"
@@ -161,16 +161,6 @@ class LongChauApiClient:
                 t = ticket_map[t_id]
                 # Merge ticket and violation
                 merged = {**t, **v}
-                # Log the keys of the first record to a file
-                if not getattr(self, "_logged_keys", False):
-                    self._logged_keys = True
-                    import json
-                    try:
-                        with open("long_chau_ticket.json", "w", encoding="utf-8") as fk:
-                            json.dump(t, fk, ensure_ascii=False, indent=2)
-                        with open("long_chau_violation.json", "w", encoding="utf-8") as fk:
-                            json.dump(v, fk, ensure_ascii=False, indent=2)
-                    except: pass
                 # Rename keys to clarify
                 merged["ticket_id_ref"] = t["_id"]
                 merged["violation_id"] = v["_id"]

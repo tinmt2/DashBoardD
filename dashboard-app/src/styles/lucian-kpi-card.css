@@ -1,0 +1,307 @@
+/* Lucian UX/UI Prompt #050, #098, #049 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/
+   Theme tokens and physics adapted for DashBoardD KPI Cards */
+
+/* ── KPI Card Container ── */
+.lucian-kpi-card {
+  position: relative;
+  height: 720px;
+}
+
+.lucian-kpi-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-radius: 28px;
+  background: var(--ux-surface, #ffffff);
+  border: 1px solid rgba(22, 21, 27, 0.08);
+  box-shadow: 0 4px 20px -4px rgba(15, 23, 42, 0.05), 0 2px 6px -2px rgba(15, 23, 42, 0.03);
+  transition: transform 0.38s cubic-bezier(0.16, 1, 0.3, 1), 
+              box-shadow 0.38s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* Card Hover Elevation */
+.lucian-kpi-card:hover .lucian-kpi-inner {
+  transform: translateY(-8px);
+}
+
+/* ── Top Indicator Accent Strip ── */
+.lucian-kpi-inner::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 20;
+  opacity: 0.6;
+  transition: opacity 0.35s ease, height 0.35s ease;
+}
+
+.lucian-kpi-card:hover .lucian-kpi-inner::before {
+  opacity: 1;
+  height: 4.5px;
+}
+
+/* ── 1. FPT Shop Signature Hover (Rose / Crimson Glow) ── */
+.lucian-inner-fpt::before {
+  background: linear-gradient(90deg, #E11D48 0%, #FB7185 50%, #E11D48 100%);
+}
+
+.lucian-card-fpt:hover .lucian-kpi-inner {
+  border-color: rgba(225, 29, 72, 0.38);
+  box-shadow: 0 22px 48px -10px rgba(225, 29, 72, 0.22),
+              0 0 0 1.5px rgba(225, 29, 72, 0.25),
+              0 4px 12px rgba(225, 29, 72, 0.06);
+}
+
+.lucian-card-fpt:hover .lucian-cta-btn {
+  color: #E11D48;
+  border-color: rgba(225, 29, 72, 0.35);
+  box-shadow: 0 4px 14px rgba(225, 29, 72, 0.18);
+}
+
+.lucian-card-fpt .lucian-cat-row:hover {
+  background: rgba(255, 241, 242, 0.65);
+}
+
+/* ── 2. Long Châu Signature Hover (Sapphire / Royal Blue Glow) ── */
+.lucian-inner-lc::before {
+  background: linear-gradient(90deg, #1D4ED8 0%, #60A5FA 50%, #1D4ED8 100%);
+}
+
+.lucian-card-lc:hover .lucian-kpi-inner {
+  border-color: rgba(37, 99, 235, 0.38);
+  box-shadow: 0 22px 48px -10px rgba(37, 99, 235, 0.22),
+              0 0 0 1.5px rgba(37, 99, 235, 0.25),
+              0 4px 12px rgba(37, 99, 235, 0.06);
+}
+
+.lucian-card-lc:hover .lucian-cta-btn {
+  color: #1D4ED8;
+  border-color: rgba(37, 99, 235, 0.35);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.18);
+}
+
+.lucian-card-lc .lucian-cat-row:hover {
+  background: rgba(239, 246, 255, 0.65);
+}
+
+/* ── 3. Vaccine Signature Hover (Emerald / Clinical Mint Glow) ── */
+.lucian-inner-vac::before {
+  background: linear-gradient(90deg, #0D9488 0%, #2DD4BF 50%, #0D9488 100%);
+}
+
+.lucian-card-vac:hover .lucian-kpi-inner {
+  border-color: rgba(13, 148, 136, 0.38);
+  box-shadow: 0 22px 48px -10px rgba(13, 148, 136, 0.22),
+              0 0 0 1.5px rgba(13, 148, 136, 0.25),
+              0 4px 12px rgba(13, 148, 136, 0.06);
+}
+
+.lucian-card-vac:hover .lucian-cta-btn {
+  color: #0D9488;
+  border-color: rgba(13, 148, 136, 0.35);
+  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.18);
+}
+
+.lucian-card-vac .lucian-cat-row:hover {
+  background: rgba(240, 253, 250, 0.65);
+}
+
+/* ── KPI Header Area ── */
+.lucian-kpi-header {
+  position: relative;
+  height: 200px;
+  padding: 24px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* ── Lucian Spring CTA Button (#049 / #050) ── */
+.lucian-cta-btn {
+  pointer-events: auto;
+  position: relative;
+  height: 32px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  color: var(--card-accent, #6A57F2);
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  transition: transform 0.35s var(--ux-spring, cubic-bezier(0.34, 1.45, 0.64, 1)), box-shadow 0.3s, background-color 0.2s;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.lucian-cta-btn:hover {
+  background: #ffffff;
+  transform: translateY(-1.5px) scale(1.02);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+.lucian-cta-btn:active {
+  transform: scale(0.94);
+}
+
+.lucian-cta-arrow {
+  transition: transform 0.25s var(--ux-spring, cubic-bezier(0.34, 1.45, 0.64, 1));
+}
+
+.lucian-cta-btn:hover .lucian-cta-arrow {
+  transform: translateX(2.5px);
+}
+
+/* ── Lucian Rolling Digits (#098) ── */
+.lucian-rolling-digits {
+  display: inline-flex;
+  align-items: baseline;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  overflow: hidden;
+}
+
+.lucian-col {
+  display: inline-flex;
+  flex-direction: column;
+  height: 1.15em;
+  line-height: 1.15em;
+  overflow: hidden;
+  vertical-align: top;
+}
+
+.lucian-col-inner {
+  display: flex;
+  flex-direction: column;
+  transform: translateY(calc(var(--d, 0) * -10%));
+  transition: transform 0.65s var(--ux-spring, cubic-bezier(0.34, 1.45, 0.64, 1));
+}
+
+.lucian-col-inner span {
+  display: block;
+  height: 1.15em;
+  line-height: 1.15em;
+  text-align: center;
+}
+
+.lucian-sym {
+  display: inline-block;
+  height: 1.15em;
+  line-height: 1.15em;
+}
+
+
+
+/* ── Error List Section ── */
+.lucian-list-header {
+  padding: 14px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--ux-line, rgba(22, 21, 27, 0.06));
+  background: #ffffff;
+  shrink: 0;
+}
+
+.lucian-list-body {
+  flex: 1;
+  overflow-y: auto;
+  background: #ffffff;
+}
+
+/* ── Custom Category Row ── */
+.lucian-cat-row {
+  display: flex;
+  align-items: center;
+  padding: 10px 22px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s;
+  border-bottom: 1px solid rgba(241, 245, 249, 0.8);
+}
+
+.lucian-cat-row:last-child {
+  border-bottom: 0;
+}
+
+.lucian-cat-row:hover {
+  background-color: rgba(248, 250, 252, 0.9);
+}
+
+.lucian-rank-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11.5px;
+  font-weight: 800;
+  shrink: 0;
+}
+
+.lucian-rank-1 {
+  background: linear-gradient(135deg, #FEF08A, #F59E0B);
+  color: #78350F;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.25);
+}
+
+.lucian-rank-2 {
+  background: linear-gradient(135deg, #F1F5F9, #CBD5E1);
+  color: #334155;
+  box-shadow: 0 2px 6px rgba(148, 163, 184, 0.25);
+}
+
+.lucian-rank-3 {
+  background: linear-gradient(135deg, #FFEDD5, #FB923C);
+  color: #7C2D12;
+  box-shadow: 0 2px 6px rgba(251, 146, 60, 0.25);
+}
+
+.lucian-rank-n {
+  color: #94A3B8;
+  font-weight: 700;
+}
+
+.lucian-progress-track {
+  height: 4.5px;
+  width: 100%;
+  border-radius: 999px;
+  background-color: #F1F5F9;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.lucian-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.6s var(--ux-spring, cubic-bezier(0.34, 1.45, 0.64, 1));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lucian-kpi-inner,
+  .lucian-building-img,
+  .lucian-col-inner,
+  .lucian-cta-btn,
+  .lucian-progress-fill {
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
+  }
+}

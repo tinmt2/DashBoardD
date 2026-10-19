@@ -8,8 +8,11 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 class VaccineBrowserSession(BaseBrowserSession):
-    def start(self, probe_only=False):
-        super().start(probe_only)
+    def start(self, probe_only=False, headless=False):
+        self._sso_clicked = False
+        self._closing_thread_started = False
+        self._initial_probed = True
+        super().start(probe_only=probe_only, headless=headless)
         if getattr(self, '_needs_storage_clear', False) and self.driver:
             try:
                 self.driver.execute_script("window.localStorage.clear(); window.sessionStorage.clear();")
@@ -17,9 +20,11 @@ class VaccineBrowserSession(BaseBrowserSession):
                 self._needs_storage_clear = False
                 self.driver.get(self.start_url)
             except: pass
-        import time
-        time.sleep(3) # Wait for Budibase redirect
-        self.status = self.get_status()
+        if self.driver:
+            import time
+            time.sleep(3) # Wait for Budibase redirect
+            self.status = self.get_status()
+
         return self.status
 
     _instance = None
@@ -30,7 +35,7 @@ class VaccineBrowserSession(BaseBrowserSession):
         self.cached_headers = None
         self._needs_storage_clear = False
         super().__init__(
-            profile_name="fpt-sso-profile",
+            profile_name="vaccine-profile",
             start_url=settings.VACCINE_LOGIN_URL
         )
 
@@ -48,12 +53,11 @@ class VaccineBrowserSession(BaseBrowserSession):
     def get_status(self) -> str:
         with self._lock:
             if self.driver is None:
-                if self.status == "AUTHENTICATED":
+                if self.status == "AUTHENTICATED" and self.cached_cookies and any(k in self.cached_cookies for k in ['budibase:auth', 'bb-auth']):
                     return self.status
                 if self.status != "ERROR":
                     self.status = "STOPPED"
                 return self.status
-                
 
             try:
                 # Always ensure we are on a valid window
@@ -68,7 +72,12 @@ class VaccineBrowserSession(BaseBrowserSession):
                     
                 url = self.driver.current_url.lower()
 
-                
+                cookies_dict = {}
+                try:
+                    cookies_dict = {c['name']: c['value'] for c in self.driver.get_cookies()}
+                except: pass
+                has_auth_cookie = any(k in cookies_dict for k in ['budibase:auth', 'bb-auth'])
+
                 # Check for login pages
                 if "identity.fptshop" in url or "identity.frt.vn" in url or "accounts.google" in url or "microsoft" in url:
                     try:
@@ -95,7 +104,7 @@ class VaccineBrowserSession(BaseBrowserSession):
                     except: pass
                     
                     page_source = self.driver.page_source.lower()
-                    if "otp" in page_source or "mA xAc nh-n" in page_source or "mA xAc nh-n" in page_source:
+                    if "otp" in page_source or "mã xác nhận" in page_source:
                         self.status = "OTP_REQUIRED"
                         try: self.driver.maximize_window()
                         except: pass
@@ -103,7 +112,7 @@ class VaccineBrowserSession(BaseBrowserSession):
                         self.status = "LOGIN_PAGE"
                         try: self.driver.maximize_window()
                         except: pass
-                elif "ptt-public.frt.vn" in url and "login" in url:
+                elif ("ptt-public.frt.vn" in url and "login" in url) or "auth/login" in url:
                     self.status = "LOGIN_PAGE"
                     try:
                         self.driver.maximize_window()
@@ -113,16 +122,16 @@ class VaccineBrowserSession(BaseBrowserSession):
                             
                         if "ptt-public.frt.vn" in self.driver.current_url.lower():
                             if not getattr(self, '_sso_clicked', False):
-                                button = self.driver.find_element(By.XPATH, "//*[contains(text(), 'FPT Retail Account')]")
-                                self.driver.execute_script("arguments[0].click();", button)
-                                self._sso_clicked = True
-                                import time
-                                time.sleep(1)
-                                if len(self.driver.window_handles) > 1:
-                                    self.driver.switch_to.window(self.driver.window_handles[-1])
+                                buttons = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'FPT Retail Account')]")
+                                if buttons:
+                                    self.driver.execute_script("arguments[0].click();", buttons[0])
+                                    self._sso_clicked = True
+                                    import time
+                                    time.sleep(1)
+                                    if len(self.driver.window_handles) > 1:
+                                        self.driver.switch_to.window(self.driver.window_handles[-1])
                     except:
                         pass
-                
 
                 elif "builder/apps" in url:
                     self.status = "NAVIGATING"
@@ -131,51 +140,66 @@ class VaccineBrowserSession(BaseBrowserSession):
                     except:
                         pass
                 elif "frt-gscmr-vaccine" in url:
-                    csrf_token = None
-                    try:
-                        csrf_token = self.driver.execute_script("return window.localStorage.getItem('csrf-token');")
-                    except: pass
-                    
-                    if not csrf_token:
-                        self.status = "NAVIGATING"
-                    else:
-                        self.status = "AUTHENTICATED"
-                        try: self.get_auth_cookies()
+                    if has_auth_cookie:
+                        csrf_token = None
+                        try:
+                            csrf_token = self.driver.execute_script("return window.localStorage.getItem('csrf-token');")
                         except: pass
+                        
+                        self.status = "AUTHENTICATED"
+                        self.cached_cookies = cookies_dict
                         
                         self.cached_headers = {
                             "Accept": "application/json",
                             "Content-Type": "application/json",
-                            "x-budibase-app-id": settings.VACCINE_APP_ID,
-                            "x-csrf-token": csrf_token
+                            "x-budibase-app-id": self.get_app_id(),
+                            "x-csrf-token": csrf_token if csrf_token else ""
                         }
                         
-                        if True:
-                            import threading
-                            def switch_headless():
-                                try:
-                                    import time
-                                    time.sleep(1)
-                                    with self._lock:
-                                        if self.driver:
-                                            try: self.driver.quit()
-                                            except: pass
-                                            self.clear_driver()
-                                except: pass
-                            threading.Thread(target=switch_headless).start()
+                        def switch_headless():
+                            try:
+                                import time
+                                time.sleep(1.0)
+                                driver_to_quit = None
+                                with self._lock:
+                                    if self.driver:
+                                        driver_to_quit = self.driver
+                                        self.clear_driver()
+                                if driver_to_quit:
+                                    try: driver_to_quit.quit()
+                                    except: pass
+                            except: pass
+                        if not getattr(self, '_closing_thread_started', False):
+                            self._closing_thread_started = True
+                            threading.Thread(target=switch_headless, daemon=True).start()
+                    else:
+                        # Page is still loading or rendering login modal
+                        body_text = ""
+                        try:
+                            body_text = self.driver.find_element(By.TAG_NAME, "body").text.lower()
+                        except: pass
+                        if "log in" in body_text or "đăng nhập" in body_text:
+                            self.status = "LOGIN_PAGE"
+                            try:
+                                buttons = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'FPT Retail Account')]")
+                                if buttons and not getattr(self, '_sso_clicked', False):
+                                    self.driver.execute_script("arguments[0].click();", buttons[0])
+                                    self._sso_clicked = True
+                            except: pass
+                        else:
+                            self.status = "NAVIGATING"
                 else:
                     self.status = "UNKNOWN"
             except Exception as e:
-                logger.error(f"Vaccine browser session lost: {e}")
-                self.status = "STOPPED"
+                if self.status != "AUTHENTICATED":
+                    logger.error(f"Vaccine browser session lost: {e}")
+                    self.status = "STOPPED"
                 self.clear_driver()
                 
             return self.status
 
     def get_auth_cookies(self):
-        if self.status != "AUTHENTICATED":
-            return None
-        if getattr(self, "cached_cookies", None):
+        if getattr(self, "cached_cookies", None) and any(k in self.cached_cookies for k in ['budibase:auth', 'bb-auth']):
             return self.cached_cookies
         if not self.driver:
             return None
@@ -183,8 +207,20 @@ class VaccineBrowserSession(BaseBrowserSession):
         cookies = {}
         for c in self.driver.get_cookies():
             cookies[c['name']] = c['value']
-        self.cached_cookies = cookies
-        return cookies
+        if any(k in cookies for k in ['budibase:auth', 'bb-auth']):
+            self.cached_cookies = cookies
+            return cookies
+        return None
+
+    def get_app_id(self):
+        return settings.VACCINE_APP_ID
 
     def get_auth_headers(self):
-        return getattr(self, "cached_headers", None)
+        if not getattr(self, "cached_headers", None):
+            self.cached_headers = {
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "x-budibase-app-id": self.get_app_id(),
+                "x-csrf-token": ""
+            }
+        return self.cached_headers

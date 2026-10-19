@@ -16,6 +16,7 @@ class FPTBrowserSession(BaseBrowserSession):
             profile_name="fpt-shop-profile",
             start_url="https://calllog.fptshop.com.vn/Report/DebtConfirm"
         )
+        self.temp_creds = None
         
     @classmethod
     def get_instance(cls):
@@ -24,8 +25,59 @@ class FPTBrowserSession(BaseBrowserSession):
                 cls._instance = FPTBrowserSession()
         return cls._instance
 
+    def _force_show_window(self):
+        if os.name != 'nt':
+            return
+        try:
+            if not self.driver:
+                return
+            self.driver.maximize_window()
+            import ctypes
+            title = self.driver.title or ""
+            hwnd = ctypes.windll.user32.FindWindowW(None, title + " - Google Chrome")
+            if not hwnd:
+                hwnd = ctypes.windll.user32.FindWindowW(None, title)
+            if hwnd:
+                ctypes.windll.user32.ShowWindow(hwnd, 5) # SW_SHOW
+                ctypes.windll.user32.SetForegroundWindow(hwnd)
+        except Exception:
+            pass
+
+    def _force_minimize_window(self):
+        if os.name != 'nt':
+            return
+        try:
+            if not self.driver:
+                return
+            try:
+                self.driver.minimize_window()
+            except Exception:
+                pass
+            import ctypes
+            title = self.driver.title or ""
+            candidates = [
+                title + " - Google Chrome",
+                title,
+                "Báo cáo Chi tiết thiết bị - Hệ thống CallLog - Google Chrome",
+                "Báo cáo Chi tiết thiết bị - Google Chrome",
+                "CallLog - Google Chrome"
+            ]
+            hwnd = None
+            for c in candidates:
+                if c.strip():
+                    hwnd = ctypes.windll.user32.FindWindowW(None, c)
+                    if hwnd:
+                        break
+            if not hwnd:
+                hwnd = ctypes.windll.user32.FindWindowW("Chrome_WidgetWin_1", None)
+            if hwnd:
+                ctypes.windll.user32.ShowWindow(hwnd, 6) # SW_MINIMIZE
+        except Exception:
+            pass
+
     def _is_on_target_page(self) -> bool:
-        if not self.driver: return False
+        if not self.driver:
+            return False
         url = self.driver.current_url.lower()
         if "calllog.fptshop.com.vn/report/debtconfirm" in url:
             return True
@@ -33,6 +85,10 @@ class FPTBrowserSession(BaseBrowserSession):
             # We are in the auth flow, do not redirect
             return True
         return False
+
+    def start(self, probe_only=False, headless=False):
+        self._closing_thread_started = False
+        return super().start(probe_only=probe_only, headless=headless)
 
     def get_status(self):
         with self._lock:
@@ -47,22 +103,30 @@ class FPTBrowserSession(BaseBrowserSession):
                 url = self.driver.current_url.lower()
                 
                 if "calllog.fptshop.com.vn/report/debtconfirm" in url:
-                    if self.status != "AUTHENTICATED":
-                        pass # Removed minimize_window
                     self.status = "AUTHENTICATED"
-                    if not getattr(self, "is_headless", True):
-                        import threading
-                        def switch_headless():
-                            try:
-                                import time
-                                time.sleep(1)
-                                with self._lock:
-                                    if self.driver:
-                                        try: self.driver.quit()
-                                        except: pass
-                                        self.driver = None
-                            except: pass
-                        threading.Thread(target=switch_headless).start()
+                    self._force_minimize_window()
+                    
+                    # Close the visible browser window after completing authentication so it doesn't linger on screen
+                    def switch_headless():
+                        try:
+                            import time
+                            time.sleep(1.0)
+                            driver_to_quit = None
+                            with self._lock:
+                                if self.driver and not getattr(self, 'is_headless', False):
+                                    driver_to_quit = self.driver
+                                    self.clear_driver()
+                            if driver_to_quit:
+                                try:
+                                    driver_to_quit.quit()
+                                except Exception:
+                                    pass
+                        except Exception:
+                            pass
+                    
+                    if not getattr(self, '_closing_thread_started', False) and not getattr(self, 'is_headless', False):
+                        self._closing_thread_started = True
+                        threading.Thread(target=switch_headless, daemon=True).start()
                     
                 elif "identity.fptshop.com.vn" in url:
                     try:
@@ -94,29 +158,21 @@ class FPTBrowserSession(BaseBrowserSession):
                     page_source = self.driver.page_source.lower()
                     if "otp" in page_source or "mã xác nhận" in page_source or "authenticator" in page_source or "verification" in page_source:
                         self.status = "OTP_REQUIRED"
-                        try:
-                            self._force_show_window()
-                        except:
-                            pass
+                        self._force_show_window()
                     else:
                         self.status = "LOGIN_PAGE"
 
                 elif "accounts.google.com" in url or "login.microsoftonline.com" in url:
                     self.status = "OTP_REQUIRED"
-                    try:
-                        self._force_show_window()
-                    except:
-                        pass
+                    self._force_show_window()
                 else:
                     self.status = "UNKNOWN"
-                    try:
-                        self._force_show_window()
-                    except:
-                        pass
+                    self._force_show_window()
                         
             except Exception as e:
-                logger.error(f"FPT browser session lost: {e}")
-                self.status = "STOPPED"
-                self.driver = None
+                if self.status != "AUTHENTICATED":
+                    logger.error(f"FPT browser session lost: {e}")
+                    self.status = "STOPPED"
+                self.clear_driver()
                 
             return self.status

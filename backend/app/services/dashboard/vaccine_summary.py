@@ -18,6 +18,7 @@ from app.schemas.vaccine_dashboard import (
     VaccineShopStat,
     VaccineRegionStat
 )
+from app.core.reminder import get_reminder_filter
 
 class VaccineDashboardSummary:
     def __init__(self, db: Session):
@@ -55,26 +56,99 @@ class VaccineDashboardSummary:
         ).group_by(Ticket.ticket_status).all()
         ticket_status_stats = [{"status": s if s else "Khác", "count": c} for s, c in ticket_statuses]
 
-        # Global Total Reminders (from note)
-        total_reminders = query.filter(Ticket.note.isnot(None), func.trim(Ticket.note) != '').count()
+        # Summary Stats (Tổng kết - Cột Y: Không phạt, Phạt, v.v.)
+        raw_summaries = join_query.with_entities(
+            VaccineTicketDetail.summary,
+            func.count(Ticket.id)
+        ).group_by(VaccineTicketDetail.summary).all()
 
-        # Employees
-        total_employees = join_query.filter(
+        non_penalty_count = 0
+        penalty_count = 0
+        summary_stats = []
+
+        for s_raw, count in raw_summaries:
+            s_clean = (s_raw or "").strip()
+            s_lower = s_clean.lower()
+            if not s_clean:
+                status_label = "Chưa tổng kết"
+            else:
+                status_label = s_clean
+            
+            if "không phạt" in s_lower or "khong phat" in s_lower:
+                non_penalty_count += count
+            elif "phạt" in s_lower or "phat" in s_lower:
+                penalty_count += count
+
+            summary_stats.append({
+                "status": status_label,
+                "count": count
+            })
+
+        # Global Total Reminders (from note)
+        total_reminders = query.filter(Ticket.note.isnot(None), get_reminder_filter(Ticket.note)).count()
+
+        # Employees (count distinct users case-insensitively)
+        requesters = join_query.filter(
             VaccineTicketDetail.requester.isnot(None), 
             func.trim(VaccineTicketDetail.requester) != ''
-        ).with_entities(func.count(func.distinct(VaccineTicketDetail.requester))).scalar() or 0
+        ).with_entities(VaccineTicketDetail.requester).all()
+        total_employees = len(set(r[0].split('@')[0].strip().lower() for r in requesters if r[0]))
 
-        employees_with_errors = join_query.filter(
+        error_requesters = join_query.filter(
             Ticket.error_status == "ERROR",
             VaccineTicketDetail.requester.isnot(None), 
             func.trim(VaccineTicketDetail.requester) != ''
-        ).with_entities(func.count(func.distinct(VaccineTicketDetail.requester))).scalar() or 0
+        ).with_entities(VaccineTicketDetail.requester).all()
+        employees_with_errors = len(set(r[0].split('@')[0].strip().lower() for r in error_requesters if r[0]))
 
         # Shops
         total_shops = query.filter(
             Ticket.shop_code.isnot(None), 
             func.trim(Ticket.shop_code) != ''
         ).with_entities(func.count(func.distinct(Ticket.shop_code))).scalar() or 0
+
+        # Employee Error Ranking & Status Breakdown (Normalized case-insensitively)
+        from collections import defaultdict
+        emp_counts = defaultdict(int)
+        emp_status_map = defaultdict(lambda: defaultdict(int))
+        emp_reminders_map = defaultdict(int)
+        emp_canonical_name = {}
+
+        employee_tickets = join_query.filter(
+            Ticket.error_status == "ERROR",
+            VaccineTicketDetail.requester.isnot(None),
+            func.trim(VaccineTicketDetail.requester) != ''
+        ).with_entities(
+            VaccineTicketDetail.requester,
+            Ticket.ticket_status,
+            Ticket.note
+        ).all()
+
+        for req, status, note in employee_tickets:
+            raw_id = req.split('@')[0].strip() if '@' in req else req.strip()
+            key = raw_id.lower()
+            if not key:
+                continue
+
+            if key not in emp_canonical_name or (raw_id != raw_id.lower() and emp_canonical_name[key] == emp_canonical_name[key].lower()):
+                emp_canonical_name[key] = raw_id
+
+            emp_counts[key] += 1
+            s_name = status if status else "Khác"
+            emp_status_map[key][s_name] += 1
+
+            if note and any(k in note.lower() for k in ["nhắc", "nhac", "reminder", "remind"]):
+                emp_reminders_map[key] += 1
+
+        employee_ranking = []
+        for key, count in sorted(emp_counts.items(), key=lambda x: x[1], reverse=True):
+            canon_name = emp_canonical_name[key]
+            employee_ranking.append(VaccineEmployeeStat(
+                employeeName=canon_name,
+                errorCount=count,
+                statusStats=dict(emp_status_map[key]),
+                totalReminders=emp_reminders_map[key]
+            ))
 
         # Error Type Ranking
         all_errors = join_query.filter(
@@ -85,76 +159,21 @@ class VaccineDashboardSummary:
             VaccineTicketDetail.requester
         ).all()
         
-        from collections import defaultdict
         error_type_counts = defaultdict(int)
         error_type_employees = defaultdict(lambda: defaultdict(int))
         
         for r in all_errors:
             etype = r.error_type
             error_type_counts[etype] += 1
-            emp = r.requester.split('@')[0] if r.requester else "Unknown"
-            error_type_employees[etype][emp] += 1
+            raw_emp = r.requester.split('@')[0].strip() if r.requester else "Unknown"
+            emp_key = raw_emp.lower()
+            canon_emp = emp_canonical_name.get(emp_key, raw_emp)
+            error_type_employees[etype][canon_emp] += 1
             
         error_type_stats = []
         for etype, count in sorted(error_type_counts.items(), key=lambda x: x[1], reverse=True):
             emps = [{"name": name, "count": c} for name, c in sorted(error_type_employees[etype].items(), key=lambda x: x[1], reverse=True)]
             error_type_stats.append(VaccineErrorTypeStat(errorType=etype, count=count, employees=emps))
-
-        # Employee Error Ranking (group by requester, strip @fpt.com)
-        employee_results = join_query.filter(
-            Ticket.error_status == "ERROR",
-            VaccineTicketDetail.requester.isnot(None),
-            func.trim(VaccineTicketDetail.requester) != ''
-        ).with_entities(
-            VaccineTicketDetail.requester.label("requester"), 
-            func.count(Ticket.id).label('count')
-        ).group_by(VaccineTicketDetail.requester).order_by(func.count(Ticket.id).desc()).all()
-        
-        # Employee Status Stats
-        emp_status_query = join_query.filter(
-            Ticket.error_status == "ERROR",
-            VaccineTicketDetail.requester.isnot(None),
-            func.trim(VaccineTicketDetail.requester) != ''
-        ).with_entities(
-            VaccineTicketDetail.requester,
-            Ticket.ticket_status,
-            func.count(Ticket.id)
-        ).group_by(VaccineTicketDetail.requester, Ticket.ticket_status).all()
-
-        emp_status_map = {}
-        for req, status, count in emp_status_query:
-            if not req: continue
-            name = req.split('@')[0] if '@' in req else req
-            if name not in emp_status_map:
-                emp_status_map[name] = {}
-            s_name = status if status else "Khác"
-            emp_status_map[name][s_name] = count
-
-        # Employee Reminders
-        emp_reminders_query = join_query.filter(
-            VaccineTicketDetail.requester.isnot(None),
-            func.trim(VaccineTicketDetail.requester) != '',
-            Ticket.note.isnot(None), func.trim(Ticket.note) != ''
-        ).with_entities(
-            VaccineTicketDetail.requester,
-            func.count(Ticket.id)
-        ).group_by(VaccineTicketDetail.requester).all()
-
-        emp_reminders_map = {}
-        for req, count in emp_reminders_query:
-            if not req: continue
-            name = req.split('@')[0] if '@' in req else req
-            emp_reminders_map[name] = emp_reminders_map.get(name, 0) + count
-
-        employee_ranking = []
-        for r in employee_results:
-            name = r.requester.split('@')[0] if '@' in r.requester else r.requester
-            employee_ranking.append(VaccineEmployeeStat(
-                employeeName=name, 
-                errorCount=r.count,
-                statusStats=emp_status_map.get(name, {}),
-                totalReminders=emp_reminders_map.get(name, 0)
-            ))
 
         # Shop Error Ranking
         shop_results = query.filter(
@@ -197,6 +216,9 @@ class VaccineDashboardSummary:
             employeesWithErrors=employees_with_errors,
             totalShops=total_shops,
             totalReminders=total_reminders,
+            nonPenaltyCount=non_penalty_count,
+            penaltyCount=penalty_count,
+            summaryStats=summary_stats,
             chainStats=chain_stats,
             errorTypeStats=error_type_stats,
             employeeErrorRanking=employee_ranking,

@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "./styles/lucian-tokens.css";
+@import "./styles/lucian-kpi-card.css";
 
 @theme {
   /* ── Core Palette ─────────────────────────────── */
@@ -90,6 +92,15 @@
   animation: sparkleIn 300ms ease-out both;
 }
 
+@keyframes slideLeft {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+.animate-slide-left {
+  animation: slideLeft 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* Staggered children */
 .stagger-children > *:nth-child(1) { animation-delay: 0ms; }
 .stagger-children > *:nth-child(2) { animation-delay: 50ms; }
@@ -113,14 +124,100 @@
   gap: 16px;
 }
 
-@keyframes fall {
-  0% { transform: translateY(-20px) rotate(0deg); opacity: 0; }
-  10% { opacity: 0.8; }
-  90% { opacity: 0.8; }
-  100% { transform: translateY(120vh) rotate(360deg); opacity: 0; }
-}
 
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* ── Smooth Glide (Mẫu 1) Animations ───────────────── */
+@keyframes pageGlide {
+  0% {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-page-glide {
+  animation: pageGlide 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes numberRoll {
+  0% {
+    opacity: 0.2;
+    transform: translateY(14px);
+    filter: blur(2px);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(-2px);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-number-roll {
+  animation: numberRoll 550ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes toastPopIn {
+  0% {
+    opacity: 0;
+    transform: translateX(50px) scale(0.92);
+  }
+  70% {
+    transform: translateX(-4px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.animate-toast-pop {
+  animation: toastPopIn 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes iconBounce {
+  0% { transform: scale(0) rotate(-20deg); }
+  60% { transform: scale(1.2) rotate(6deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+.animate-icon-bounce {
+  animation: iconBounce 450ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* ── Form Inputs & Autofill Contrast Overrides ────── */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #0f172a !important;
+  caret-color: #0f172a !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Ensure inputs, selects, and textareas inside white surfaces always render dark text */
+.bg-white input,
+.bg-white select,
+.bg-white textarea,
+input.bg-white,
+select.bg-white,
+textarea.bg-white {
+  color: #0f172a !important;
+}
+
+.bg-white input::placeholder,
+input.bg-white::placeholder {
+  color: #94a3b8 !important;
+}
+

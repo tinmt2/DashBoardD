@@ -25,7 +25,7 @@ class TicketDeduplicator:
             Ticket.ticket_id.in_(incoming_ids)
         ).all()
         
-        existing_identities = {f"{t.ticket_id}_{t.error_type}_{t.error_reason}" for t in existing_db_records}
+        existing_map = {f"{t.ticket_id}_{t.error_type}_{t.error_reason}": t for t in existing_db_records}
         
         processed_in_batch = set()
 
@@ -36,7 +36,25 @@ class TicketDeduplicator:
                 
             identity = self._get_identity(record)
                 
-            if identity in existing_identities or identity in processed_in_batch:
+            if identity in existing_map:
+                existing_ticket = existing_map[identity]
+                # Check if fields have updated (e.g. ticket_status, note, employee_name)
+                is_updated = False
+                if record.ticket_status and record.ticket_status != existing_ticket.ticket_status:
+                    existing_ticket.ticket_status = record.ticket_status
+                    is_updated = True
+                if record.note and record.note != existing_ticket.note:
+                    existing_ticket.note = record.note
+                    is_updated = True
+                if record.employee_name and record.employee_name != existing_ticket.employee_name:
+                    existing_ticket.employee_name = record.employee_name
+                    is_updated = True
+                
+                if is_updated:
+                    updated_count += 1
+                else:
+                    duplicate_count += 1
+            elif identity in processed_in_batch:
                 duplicate_count += 1
             else:
                 new_records.append(record)

@@ -1,18 +1,23 @@
-import React, { useState, useEffect, useRef } from 'react';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { LucianDateRangePicker } from '../components/common/LucianDateRangePicker';
+import { CircularSpinner } from '../components/common/CircularSpinner';
+import { useSync } from '../context/SyncContext';
 
 import { createPortal } from 'react-dom';
 
-import { ChevronDown, RefreshCw, AlertCircle, UploadCloud, CheckCircle2, X, Activity, Users } from 'lucide-react';
+import { ChevronDown, RefreshCw, AlertCircle, UploadCloud, CheckCircle2, X, Activity, Users, Calendar, Clock } from 'lucide-react';
 
 import type { Chain, Employee } from '../types';
 
 import { GlassCard } from '../components/common/GlassCard';
+import { AnimatedNumber } from '../components/common/AnimatedNumber';
+import { useSidebar } from '../components/layout/Layout';
 
 import { EmployeeService } from '../services/employeeService';
 import { fetchVaccineSummary, previewVaccineImport, commitVaccineImport, startVaccineAuth, getVaccineAuthStatus, syncVaccine } from '../services/vaccineApi';
 import { fetchLongChauSummary, previewLongChauImport, commitLongChauImport, startLongChauAuth, getLongChauAuthStatus, syncLongChau } from '../services/longChauApi';
+import { getSyncTime, recordSyncTime, formatSyncTime } from '../services/syncTimeService';
+import { useNotification } from '../context/NotificationContext';
 
 import { 
 
@@ -47,40 +52,86 @@ interface Props {
 
 
 
-// Global cache to persist auth state across tab switches (unmounts)
+// Global cache to persist auth and data across tab switches (unmounts)
 let cachedLcAuth: any = null;
 let cachedVacAuth: any = null;
 let cachedFptAuth: any = null;
-
-const TannaSVG = () => (<svg width="100%" height="100%" viewBox="0 0 32 32" style={{ filter: 'drop-shadow(0px 2px 3px rgba(0,0,0,0.15))', overflow: 'visible' }}><g fill="#ffffff" stroke="#94a3b8" strokeWidth="0.8"><ellipse cx="16" cy="6" rx="3.5" ry="6" /><ellipse cx="16" cy="26" rx="3.5" ry="6" /><ellipse cx="6" cy="16" rx="6" ry="3.5" /><ellipse cx="26" cy="16" rx="6" ry="3.5" /><ellipse cx="9" cy="9" rx="6" ry="3.5" transform="rotate(45 9 9)" /><ellipse cx="23" cy="23" rx="6" ry="3.5" transform="rotate(45 23 23)" /><ellipse cx="9" cy="23" rx="6" ry="3.5" transform="rotate(-45 9 23)" /><ellipse cx="23" cy="9" rx="6" ry="3.5" transform="rotate(-45 23 9)" /></g><circle cx="16" cy="16" r="4.5" fill="#f59e0b" /><circle cx="15" cy="15" r="1.5" fill="#fbbf24" opacity="0.8" /></svg>);
-
-const CloverSVG = () => (<svg width="100%" height="100%" viewBox="0 0 24 24" style={{ filter: 'drop-shadow(0px 2px 3px rgba(0,0,0,0.15))', overflow: 'visible' }}><circle cx="9.5" cy="9.5" r="4" fill="#4ade80" /><circle cx="14.5" cy="9.5" r="4" fill="#4ade80" /><circle cx="9.5" cy="14.5" r="4" fill="#4ade80" /><circle cx="14.5" cy="14.5" r="4" fill="#4ade80" /><rect x="9.5" y="9.5" width="5" height="5" fill="#4ade80" /><path d="M12 15 Q14 21 9 23" stroke="#4ade80" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>);
+export const dashboardDataCache: Record<string, any> = {};
+export const dashboardLastUpdatedCache: Record<string, Date | null> = {};
+export const clearDashboardDataCache = () => {
+  Object.keys(dashboardDataCache).forEach(k => delete dashboardDataCache[k]);
+  Object.keys(dashboardLastUpdatedCache).forEach(k => delete dashboardLastUpdatedCache[k]);
+};
+export const clearVaccineAuthCache = () => {
+  cachedVacAuth = { authenticated: false, status: 'LOGIN_PAGE' };
+};
+export const clearLongChauAuthCache = () => {
+  cachedLcAuth = { authenticated: false, status: 'LOGIN_PAGE' };
+};
+let cachedEmployeesList: Employee[] = [];
+let hasAutoCheckedFpt = false;
 
 const Dashboard: React.FC<Props> = ({ chain }) => {
-
+  const { isCollapsed } = useSidebar();
+  const chainKey = chain || 'FPT Shop';
+  const initialData = dashboardDataCache[chainKey] || null;
 
   const textColor = '#1d1d1f';
-
   const subColor = '#86868b';
-
   const accentColor = '#FF3B30';
 
-
-
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<any>(initialData);
+  const [filterMode, setFilterMode] = useState<'all' | number | 'custom'>('custom');
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
-    new Date(new Date().setDate(new Date().getDate() - 7)),
+    new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     new Date()
   ]);
   const [startDate, endDate] = dateRange;
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const datePickerRef = useRef<HTMLDivElement>(null);
 
-  const [activeEmployees, setActiveEmployees] = useState<Employee[]>([]);
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
+        setShowDatePicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
-  const [loading, setLoading] = useState<boolean>(true);
+  const getFormattedDateRange = () => {
+    if (filterMode === 'all') return 'Tất cả ngày';
+    const format = (d: Date) => `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth()+1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+    if (typeof filterMode === 'number') {
+      const end = new Date();
+      const start = new Date();
+      start.setDate(end.getDate() - filterMode);
+      if (filterMode === 1) return `Hôm nay (${format(end)})`;
+      return `${filterMode} ngày (${format(start)} - ${format(end)})`;
+    }
+    if (filterMode === 'custom' && startDate) {
+      if (endDate) {
+        return `${format(startDate)} - ${format(endDate)}`;
+      }
+      return `${format(startDate)}`;
+    }
+    return 'Tất cả ngày';
+  };
 
-  const particles = Array.from({ length: 8 }).map((_, i) => ({ id: i, left: Math.random() * 100, size: 20 + Math.random() * 30, sway: Math.random() > 0.5 ? 1 : -1, rotHalf: Math.random() * 180, rot: Math.random() * 360, dur: 3 + Math.random() * 2, delay: Math.random() * 2, type: Math.random() > 0.5 ? 'tanna' : 'clover' }));
+  const handleApplyDateRange = (mode: 'all' | number | 'custom', start: Date | null, end: Date | null) => {
+    setFilterMode(mode);
+    setDateRange([start, end]);
+    dashboardDataCache[chainKey] = null;
+    setShowDatePicker(false);
+  };
+
+  const [activeEmployees, setActiveEmployees] = useState<Employee[]>(cachedEmployeesList);
+  const { addNotification } = useNotification();
+  const [loading, setLoading] = useState<boolean>(!initialData);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(() => getSyncTime(chainKey));
   const [mounted, setMounted] = useState(false);
-  const [showEffects, setShowEffects] = useState(false);
+  const [syncToast, setSyncToast] = useState<{ show: boolean; title: string; subtitle?: string } | null>(null);
 
   useEffect(() => setMounted(true), []);
 
@@ -114,7 +165,7 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
     setIsSettingsOpen(false);
   };
 
-  const [isSyncing, setIsSyncing] = useState(false);
+  const { isSyncing, syncDuration, syncChain, syncVersion } = useSync();
 
   const [vaccineAuth, setVaccineAuth] = useState<AuthStatusResponse | null>(cachedVacAuth);
   const [longChauAuth, setLongChauAuth] = useState<AuthStatusResponse | null>(cachedLcAuth);
@@ -128,39 +179,90 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
 
 
 
-  useEffect(() => {
-    // Initial check on mount for BOTH if not cached
-    getVaccineAuthStatus().then(res => { setVaccineAuth(res); cachedVacAuth = res; if (!res.authenticated && res.status !== 'ERROR' && res.status !== 'STOPPED') setIsVacPolling(true); }).catch(console.error);
-    getLongChauAuthStatus().then(res => { setLongChauAuth(res); cachedLcAuth = res; if (!res.authenticated && res.status !== 'ERROR' && res.status !== 'STOPPED') setIsLcPolling(true); }).catch(console.error);
-    if (!cachedFptAuth) {
-      getFptShopAuthStatus().then(res => { setFptAuth(res); cachedFptAuth = res; cachedFptAuth = res; }).catch(console.error);
+  const handleStartAuth = useCallback(async () => {
+    try {
+      if (chain === 'Vaccine') {
+        const s = { authenticated: false, status: 'STARTING' }; setVaccineAuth(s); cachedVacAuth = s;
+        let freshCreds = {username: '', password: ''};
+        try { const saved = localStorage.getItem('fptCreds'); if (saved) freshCreds = JSON.parse(saved); } catch(e){}
+        const res = await startVaccineAuth(freshCreds);
+        setVaccineAuth(res); cachedVacAuth = res;
+        if (!res.authenticated) setIsVacPolling(true);
+      } else if (chain?.includes('Long')) {
+        const s = { authenticated: false, status: 'STARTING' }; setLongChauAuth(s); cachedLcAuth = s;
+        let freshCreds = {username: '', password: ''};
+        try { const saved = localStorage.getItem('fptCreds'); if (saved) freshCreds = JSON.parse(saved); } catch(e){}
+        const res = await startLongChauAuth(freshCreds);
+        setLongChauAuth(res); cachedLcAuth = res;
+        if (!res.authenticated) setIsLcPolling(true);
+      } else {
+        const s2 = { authenticated: false, status: 'STARTING' }; setFptAuth(s2); cachedFptAuth = s2;
+        let freshCreds = {username: '', password: ''};
+        try { const saved = localStorage.getItem('fptCreds'); if (saved) freshCreds = JSON.parse(saved); } catch(e){}
+        const res = await startFptShopAuth(freshCreds);
+        setFptAuth(res); cachedFptAuth = res;
+        if (!res.authenticated) setIsFptPolling(true);
+      }
+    } catch (e) {
+      if (chain === 'Vaccine') setVaccineAuth({ authenticated: false, status: 'ERROR' });
+      else if (chain?.includes('Long')) setLongChauAuth({ authenticated: false, status: 'ERROR' });
+      else setFptAuth({ authenticated: false, status: 'ERROR' });
     }
-  }, []);
+  }, [chain]);
+
+  useEffect(() => {
+    // Only check auth status for the active chain
+    if (chain === 'Vaccine') {
+      getVaccineAuthStatus().then(res => {
+        setVaccineAuth(res);
+        cachedVacAuth = res;
+        if (res.status === 'STARTING' || res.status === 'OTP_REQUIRED' || res.status === 'LOGIN_PAGE' || res.status === 'NAVIGATING') {
+          setIsVacPolling(true);
+        }
+      }).catch(console.error);
+    } else if (chain === 'Long Châu') {
+      getLongChauAuthStatus().then(res => {
+        setLongChauAuth(res);
+        cachedLcAuth = res;
+        if (res.status === 'STARTING' || res.status === 'OTP_REQUIRED' || res.status === 'LOGIN_PAGE' || res.status === 'NAVIGATING') {
+          setIsLcPolling(true);
+        }
+      }).catch(console.error);
+    } else {
+      getFptShopAuthStatus().then(res => {
+        setFptAuth(res);
+        cachedFptAuth = res;
+        if (res.status === 'STARTING' || res.status === 'OTP_REQUIRED' || res.status === 'LOGIN_PAGE' || res.status === 'NAVIGATING') {
+          setIsFptPolling(true);
+        } else if (!res.authenticated && !hasAutoCheckedFpt) {
+          hasAutoCheckedFpt = true;
+          handleStartAuth();
+        }
+      }).catch(console.error);
+    }
+  }, [chain, handleStartAuth]);
 
   // Sync state to cache whenever it changes
   useEffect(() => { if (vaccineAuth) cachedVacAuth = vaccineAuth; }, [vaccineAuth]);
   useEffect(() => { if (longChauAuth) cachedLcAuth = longChauAuth; }, [longChauAuth]);
   useEffect(() => { if (fptAuth) cachedFptAuth = fptAuth; }, [fptAuth]);
 
+  useEffect(() => {
+    let vacInterval: any;
+    if (isVacPolling) {
+      vacInterval = setInterval(() => {
+        getVaccineAuthStatus().then((res: any) => {
+          setVaccineAuth(res); cachedVacAuth = res;
+          if (res.authenticated || res.status === 'ERROR') {
+            setIsVacPolling(false);
+          }
+        }).catch(() => setIsVacPolling(false));
+      }, 3000);
+    }
+    return () => clearInterval(vacInterval);
+  }, [isVacPolling]);
 
-
-
-    useEffect(() => {
-      let vacInterval: any;
-      if (isVacPolling) {
-        vacInterval = setInterval(() => {
-          getVaccineAuthStatus().then((res: any) => {
-            setVaccineAuth(res); cachedVacAuth = res;
-            if (res.authenticated || res.status === 'ERROR') {
-              setIsVacPolling(false);
-            }
-          }).catch(() => setIsVacPolling(false));
-        }, 3000);
-      }
-      return () => clearInterval(vacInterval);
-    }, [isVacPolling]);
-
-    useEffect(() => {
+  useEffect(() => {
     let lcInterval: any;
     if (isLcPolling) {
       lcInterval = setInterval(() => {
@@ -190,42 +292,6 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
     return () => clearInterval(fptInterval);
   }, [isFptPolling]);
 
-
-
-    const handleStartAuth = async () => {
-    try {
-      if (chain === 'Vaccine') {
-        const s = { authenticated: false, status: 'STARTING' }; setVaccineAuth(s); cachedVacAuth = s;
-        let freshCreds = {username: '', password: ''};
-        try { const saved = localStorage.getItem('fptCreds'); if (saved) freshCreds = JSON.parse(saved); } catch(e){}
-        const res = await startVaccineAuth(freshCreds);
-        setVaccineAuth(res); cachedVacAuth = res;
-        if (!res.authenticated) setIsVacPolling(true);
-      } else if (chain?.includes('Long')) {
-
-        const s = { authenticated: false, status: 'STARTING' }; setLongChauAuth(s); cachedLcAuth = s;
-        let freshCreds = {username: '', password: ''};
-        try { const saved = localStorage.getItem('fptCreds'); if (saved) freshCreds = JSON.parse(saved); } catch(e){}
-        const res = await startLongChauAuth(freshCreds);
-        setLongChauAuth(res); cachedLcAuth = res;
-        if (!res.authenticated) setIsLcPolling(true);
-      
-      } else {
-
-        const s2 = { authenticated: false, status: 'STARTING' }; setFptAuth(s2); cachedFptAuth = s2;
-        let freshCreds = {username: '', password: ''};
-        try { const saved = localStorage.getItem('fptCreds'); if (saved) freshCreds = JSON.parse(saved); } catch(e){}
-        const res = await startFptShopAuth(freshCreds);
-        setFptAuth(res); cachedFptAuth = res;
-        if (!res.authenticated) setIsFptPolling(true);
-      }
-    
-    } catch (e) {
-      if (chain === 'Vaccine') setVaccineAuth({ authenticated: false, status: 'ERROR' });
-      else if (chain?.includes('Long')) setLongChauAuth({ authenticated: false, status: 'ERROR' });
-      else setFptAuth({ authenticated: false, status: 'ERROR' });
-    }
-  };
 
 
 
@@ -264,20 +330,45 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
     setIsCommitting(true);
     try {
       const importId = (importPreview as any)?.importId;
-      if (!importId) return;
+      let commitRes: any;
       if (chain === 'Vaccine') {
-          await commitVaccineImport(importId);
-      } else if (chain === 'Long Châu') {
-        const importId = (importPreview as any)?.importId;
         if (!importId) return;
-        await commitLongChauImport(importId);
+        commitRes = await commitVaccineImport(importId);
+      } else if (chain === 'Long Châu') {
+        if (!importId) return;
+        commitRes = await commitLongChauImport(importId);
       } else {
         const filename = importPreview?.filename;
         if (!filename) return;
-        await commitFptShopImport(filename);
+        commitRes = await commitFptShopImport(filename);
       }
       setImportPreview(null);
+      const syncTime = recordSyncTime((chain || 'FPT Shop') as any);
+      setLastSyncTime(syncTime);
       await fetchData(); // Refresh data
+
+      const newErrors = commitRes?.summary?.new ?? commitRes?.new_records ?? 0;
+      const totalRows = commitRes?.summary?.total ?? commitRes?.total_rows ?? 0;
+      const dupRows = commitRes?.summary?.duplicate ?? commitRes?.duplicate_records ?? 0;
+
+      addNotification({
+        title: `Nhập file Excel ${chain || 'FPT Shop'} hoàn tất`,
+        status: 'SUCCESS',
+        sync_type: 'IMPORT_EXCEL',
+        total_new_errors: newErrors,
+        total_scanned: totalRows,
+        total_duplicates: dupRows,
+        chain_details: [
+          {
+            chain: chain || 'FPT Shop',
+            status: 'SUCCESS',
+            new_records: newErrors,
+            total_rows: totalRows,
+            duplicate_records: dupRows,
+            error_message: null
+          }
+        ]
+      }).catch(e => console.error('Lỗi khi lưu thông báo import:', e));
     } catch (err: any) {
       setImportError(err.message || 'Lỗi khi xử lý file Excel');
     } finally {
@@ -285,69 +376,50 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
     }
   };
 
-
-
-
-
   const handleSync = async (e?: React.MouseEvent) => {
     if (e) e.preventDefault();
-
-    setIsSyncing(true);
-
-    try {
-      if (!startDate) {
-          alert('Vui lòng chọn ngày');
-          setIsSyncing(false);
-          return;
-      }
-      const effEndDate = endDate || startDate;
-      if (chain === 'Vaccine') {
-        await syncVaccine({
-          start_date: new Date(startDate.getTime() - startDate.getTimezoneOffset() * 60000).toISOString().split('T')[0],
-          end_date: new Date(effEndDate.getTime() - effEndDate.getTimezoneOffset() * 60000).toISOString().split('T')[0]
-        });
-      } else if (chain === 'Long Châu') {
-        await syncLongChau({
-          start_date: new Date(startDate.getTime() - startDate.getTimezoneOffset() * 60000).toISOString().split('T')[0],
-          end_date: new Date(effEndDate.getTime() - effEndDate.getTimezoneOffset() * 60000).toISOString().split('T')[0]
-        });
-      } else {
-        await syncFptShop({
-          start_date: new Date(startDate.getTime() - startDate.getTimezoneOffset() * 60000).toISOString().split('T')[0],
-          end_date: new Date(effEndDate.getTime() - effEndDate.getTimezoneOffset() * 60000).toISOString().split('T')[0]
-        });
-      }
-
-      await fetchData();
-      setShowEffects(true);
-      setTimeout(() => setShowEffects(false), 6000);
-    } catch (err: any) {
-
-      setImportError(err.message || 'Lỗi khi xử lý file Excel');
-
-    } finally {
-
-      setIsSyncing(false);
-
-    }
-
+    await syncChain(chain || 'FPT Shop', { startDate, endDate, filterMode });
   };
 
-
+  useEffect(() => {
+    if (syncVersion > 0) {
+      fetchData();
+      setLastSyncTime(getSyncTime((chain || 'FPT Shop') as any));
+    }
+  }, [syncVersion, chain]);
 
   const fetchData = async () => {
-    setLoading(true);
+    // Only set loading to true if we don't already have cached data for this chain
+    if (!dashboardDataCache[chainKey]) {
+      setLoading(true);
+    }
     setError(null);
-    // setData(null); // REMOVED TO PREVENT UI BLINK
-    const effEndDate = endDate || startDate;
-    const syncStartDate = startDate ? new Date(startDate.getTime() - startDate.getTimezoneOffset() * 60000).toISOString().split('T')[0] : undefined;
-    const syncEndDate = effEndDate ? new Date(effEndDate.getTime() - effEndDate.getTimezoneOffset() * 60000).toISOString().split('T')[0] : undefined;
+    let syncStartDate: string | undefined = undefined;
+    let syncEndDate: string | undefined = undefined;
+
+    if (filterMode === 'all') {
+      syncStartDate = undefined;
+      syncEndDate = undefined;
+    } else if (typeof filterMode === 'number') {
+      const end = new Date();
+      const start = new Date();
+      start.setDate(end.getDate() - filterMode);
+      syncStartDate = new Date(start.getTime() - start.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+      syncEndDate = new Date(end.getTime() - end.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+    } else if (filterMode === 'custom' && startDate) {
+      const effEndDate = endDate || startDate;
+      syncStartDate = new Date(startDate.getTime() - startDate.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+      syncEndDate = new Date(effEndDate.getTime() - effEndDate.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+    }
+
     try {
       if (chain === 'Vaccine') {
         const [vacData, employees] = await Promise.all([
           fetchVaccineSummary(syncStartDate, syncEndDate),
           EmployeeService.getEmployees()
         ]);
+        dashboardDataCache[chainKey] = vacData.data;
+        cachedEmployeesList = employees;
         setData(vacData.data);
         setActiveEmployees(employees);
       } else if (chain === 'Long Châu') {
@@ -355,6 +427,8 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
           fetchLongChauSummary(syncStartDate, syncEndDate),
           EmployeeService.getEmployees()
         ]);
+        dashboardDataCache[chainKey] = lcData.data;
+        cachedEmployeesList = employees;
         setData(lcData.data);
         setActiveEmployees(employees);
       } else {
@@ -362,9 +436,13 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
           fetchDashboardSummary(syncStartDate, syncEndDate),
           EmployeeService.getEmployees()
         ]);
+        dashboardDataCache[chainKey] = summary;
+        cachedEmployeesList = employees;
         setData(summary);
         setActiveEmployees(employees);
       }
+      const now = recordSyncTime(chainKey as any);
+      setLastSyncTime(now);
     } catch (err: any) {
       setError(err.message || 'Lỗi cập nhật dữ liệu');
     } finally {
@@ -375,18 +453,18 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
 
 
   useEffect(() => {
-      fetchData();
-      
-      setImportPreview(null);
-      setImportError(null);
-      setIsImporting(false);
-      setIsCommitting(false);
-      
-      // Auto refresh every 5 minutes
-
+    setLastSyncTime(getSyncTime(chainKey));
+    fetchData();
+    
+    setImportPreview(null);
+    setImportError(null);
+    setIsImporting(false);
+    setIsCommitting(false);
+    
+    // Auto refresh every 5 minutes
     const interval = setInterval(fetchData, 5 * 60 * 1000);
-      return () => clearInterval(interval);
-    }, [chain]);
+    return () => clearInterval(interval);
+  }, [chain, filterMode, startDate, endDate]);
 
 
 
@@ -421,8 +499,8 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
       }
     }
 
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    return createPortal(
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
         <GlassCard className="w-full max-w-lg p-6 flex flex-col relative bg-white">
           <button onClick={() => { setImportPreview(null); setImportError(null); }} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors">
             <X size={20} />
@@ -468,12 +546,12 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
               </div>
               
               <div className="flex justify-end gap-3 mt-6">
-                                  <button 
-                    onClick={() => setImportPreview(null)}
-                    className="px-4 py-2 rounded-lg text-[13px] font-bold text-slate-600 hover:bg-slate-100 transition-colors"
-                  >
-                    Hủy
-                  </button>
+                <button 
+                  onClick={() => setImportPreview(null)}
+                  className="px-4 py-2 rounded-lg text-[13px] font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                >
+                  Hủy
+                </button>
                 <button 
                   onClick={handleCommitImport}
                   disabled={isCommitting || !canCommit}
@@ -489,12 +567,13 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
             </div>
           ) : null}
         </GlassCard>
-      </div>
+      </div>,
+      document.body
     );
   };
 
 
-  let kpiData = { total: 0, checked: 0, rate: '0%', employees: 0, totalEmployees: 0, reminders: 0 };
+  let kpiData = { total: 0, checked: 0, rate: '0%', employees: 0, totalEmployees: 0, reminders: 0, nonPenalty: 0, penalty: 0 };
   let chainData: any[] = [];
   let errorTypes: any[] = [];
   let topEmployees: any[] = [];
@@ -513,28 +592,46 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
         rate: `${data.errorRate || 0}%`,
         employees: data.employeesWithErrors || 0,
         totalEmployees: data.totalEmployees || 0,
-        reminders: data.totalReminders || 0
+        reminders: data.totalReminders || 0,
+        nonPenalty: data.nonPenaltyCount || 0,
+        penalty: data.penaltyCount || 0
       };
       errorTypes = (data.errorTypeStats || []).map((e: any) => ({ type: e.errorType, count: e.count, employees: e.employees }));
-      topEmployees = (data.employeeErrorRanking || []).map((e: any) => {
-          const rawId = String(e.employeeName || '').trim();
-          const matched = activeEmployees.find(emp => {
-            const empId = String(emp.id || '').trim().toLowerCase();
-            const targetId = rawId.toLowerCase();
-            return empId === targetId || empId === targetId + '@fpt.com';
-          });
-          
-          return {
-            employeeId: rawId,
+      const empMap = new Map<string, any>();
+      for (const e of (data.employeeErrorRanking || [])) {
+        const rawId = String(e.employeeName || '').trim();
+        const matched = activeEmployees.find(emp => {
+          const empId = String(emp.id || '').trim().toLowerCase();
+          const targetId = rawId.toLowerCase();
+          return empId === targetId || empId === targetId + '@fpt.com';
+        });
+
+        const key = rawId.toLowerCase();
+        if (!empMap.has(key)) {
+          empMap.set(key, {
+            employeeId: matched ? matched.id : rawId,
             name: matched ? matched.name : rawId,
             chain: chain,
-            totalErrors: e.errorCount,
+            totalErrors: Number(e.errorCount || 0),
             totalChecked: 0,
-            statusStats: e.statusStats || {},
-            totalReminders: e.totalReminders || 0,
+            statusStats: { ...(e.statusStats || {}) },
+            totalReminders: Number(e.totalReminders || 0),
             isMatched: !!matched
-          };
-        }).filter((e: any) => e.isMatched);
+          });
+        } else {
+          const existing = empMap.get(key);
+          existing.totalErrors += Number(e.errorCount || 0);
+          existing.totalReminders += Number(e.totalReminders || 0);
+          if (e.statusStats) {
+            for (const [st, cnt] of Object.entries(e.statusStats)) {
+              existing.statusStats[st] = (existing.statusStats[st] || 0) + Number(cnt || 0);
+            }
+          }
+        }
+      }
+      topEmployees = Array.from(empMap.values())
+        .filter((e: any) => e.isMatched)
+        .sort((a: any, b: any) => b.totalErrors - a.totalErrors);
       shopErrorRanking = data.shopErrorRanking || [];
       regionErrorStats = data.regionErrorStats || [];
       ticketStatusStats = data.ticketStatusStats || [];
@@ -546,7 +643,9 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
           rate: `${overview.errorRate || 0}%`,
           employees: overview.employeesWithErrors || 0,
           totalEmployees: overview.totalEmployees || 0,
-          reminders: overview.totalReminders || 0
+          reminders: overview.totalReminders || 0,
+          nonPenalty: 0,
+          penalty: 0
         };
       chainData = data.chainStats || [];
       errorTypes = data.errorTypeStats || [];
@@ -559,7 +658,29 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
 
 
     <div className="relative flex-1 overflow-x-hidden font-sans flex flex-col min-h-full">
-      <div className="fixed inset-0 overflow-hidden pointer-events-none z-[100]">{particles.map((p) => (<div key={p.id} className="absolute opacity-80" style={{ left: p.left + '%', top: '-10%', width: p.size, height: p.size, animation: showEffects ? 'fall ' + p.dur + 's linear forwards ' + p.delay + 's' : 'none', transformOrigin: 'center' }}><div style={{ animation: showEffects ? 'spin ' + (p.dur * 1.5) + 's linear infinite' : 'none' }}>{p.type === 'tanna' ? <TannaSVG /> : <CloverSVG />}</div></div>))}</div>
+
+      {/* Sync Success Toast Notification (Mẫu 1 Smooth Glide) */}
+      {syncToast?.show && createPortal(
+        <div className="fixed top-6 right-6 bg-white/95 backdrop-blur-md border border-emerald-200/80 rounded-2xl p-4 shadow-[0_10px_35px_rgba(0,0,0,0.1)] flex items-center gap-3.5 z-[9999] animate-toast-pop">
+          <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg shrink-0 border border-emerald-100 animate-icon-bounce">
+            <CheckCircle2 size={22} className="text-emerald-600" />
+          </div>
+          <div>
+            <div className="text-[14px] font-bold text-slate-800">{syncToast.title}</div>
+            {syncToast.subtitle && (
+              <div className="text-[12px] font-medium text-slate-500 mt-0.5">{syncToast.subtitle}</div>
+            )}
+          </div>
+          <button 
+            type="button"
+            onClick={() => setSyncToast(null)} 
+            className="ml-2 text-slate-400 hover:text-slate-600 p-1 rounded-lg transition-colors cursor-pointer"
+          >
+            <X size={16} />
+          </button>
+        </div>,
+        document.body
+      )}
 
       <input 
         type="file" 
@@ -571,74 +692,187 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
 
       {renderImportModal()}
 
-      {/* Last updated - top right, below settings button */}
-
-      <p className="absolute top-2 right-6 z-20 text-[12px] font-medium pointer-events-none" style={{ color: subColor }}>
-
-        Cập nhật lần cuối: {new Date().toLocaleString('vi-VN')}
-
-      </p>
+      {/* Last updated portaled to Sidebar Footer */}
+      {mounted && document.getElementById('sidebar-footer-time') && createPortal(
+        isCollapsed ? (
+          <div 
+            className="flex items-center justify-center text-slate-400 select-none w-full py-1 cursor-pointer"
+            title={`Cập nhật lần cuối: ${formatSyncTime(lastSyncTime)}`}
+          >
+            <Clock size={16} className="text-slate-400" />
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 text-slate-400 select-none w-full">
+            <Clock size={13} className="text-slate-400 shrink-0" />
+            <div className="flex flex-col leading-tight">
+              <span className="text-[9.5px] uppercase tracking-wider font-semibold text-slate-400">Cập nhật lần cuối</span>
+              <span className="font-bold text-slate-600 text-[11px] mt-0.5">
+                {formatSyncTime(lastSyncTime)}
+              </span>
+            </div>
+          </div>
+        ),
+        document.getElementById('sidebar-footer-time')!
+      )}
 
       <div className="flex-1 overflow-y-auto px-8 lg:px-12 py-10 relative z-10 w-full animate-fade-in space-y-6">
 
-        
-
         {/* Top Section */}
-
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-8 mb-8 w-full">
 
+          {/* Connect, Import, Sync & DatePicker buttons portaled to Sidebar Header */}
+          {mounted && document.getElementById('sidebar-actions') && createPortal(
+            isCollapsed ? (
+              <div className="flex flex-col items-center gap-2 bg-slate-50/70 rounded-2xl p-1.5 border border-slate-200/60 shadow-2xs w-full">
+                {/* 1. Nút Chọn ngày */}
+                <div className="relative flex justify-center w-full" ref={datePickerRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowDatePicker(!showDatePicker)}
+                    className="w-10 h-10 rounded-xl flex items-center justify-center bg-white hover:bg-slate-50 text-indigo-600 border border-slate-200/80 transition-all cursor-pointer shadow-2xs"
+                    title={`Khoảng ngày: ${getFormattedDateRange()}`}
+                  >
+                    <Calendar size={16} />
+                  </button>
+                  {showDatePicker && (
+                    <LucianDateRangePicker
+                      filterMode={filterMode}
+                      startDate={startDate}
+                      endDate={endDate}
+                      onApply={handleApplyDateRange}
+                      onClose={() => setShowDatePicker(false)}
+                      positionClasses="absolute left-[calc(100%+14px)] top-0"
+                    />
+                  )}
+                </div>
 
-
-          {mounted && document.getElementById('topbar-actions') && createPortal(
-
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2 mr-2">
-                {authState?.authenticated ? (
-                   <span className="flex items-center justify-center w-9 h-9 rounded-[10px] border border-emerald-200 bg-emerald-50 text-emerald-600 shadow-[0_2px_8px_rgba(16,185,129,0.15)]" title="Connected">
-                     <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></div>
-                   </span>
-                ) : authState?.status === 'STARTING' || authState?.status === 'LOGIN_REQUIRED' || authState?.status === 'LOGIN_PAGE' || authState?.status === 'NAVIGATING' ? (
-                   <button onClick={handleStartAuth} className="flex items-center justify-center w-9 h-9 rounded-[10px] border border-amber-200 bg-amber-50 text-amber-600 shadow-[0_2px_8px_rgba(245,158,11,0.15)] hover:bg-amber-100 transition-colors cursor-pointer" title="Đang chờ đăng nhập... Click để mở cửa sổ">
-                     <RefreshCw size={16} className="animate-spin" />
-                   </button>
-                ) : authState?.status === 'OTP_REQUIRED' ? (
-                   <button onClick={handleStartAuth} className="flex items-center gap-1.5 text-[13px] font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-200 hover:bg-indigo-100 transition-colors cursor-pointer" title="Click để mở Chrome nhập OTP">
-                       <AlertCircle size={14} /> Nhập OTP (Mở Chrome)
-                     </button>
-                ) : authState?.status === 'ERROR' ? (
-                   <button onClick={handleStartAuth} className="flex items-center justify-center w-9 h-9 rounded-[10px] border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 transition-all shadow-sm" title="Lỗi đăng nhập (Thử lại)">
-                     <AlertCircle size={16} />
-                   </button>
-                ) : (
-                   <button onClick={handleStartAuth} className="flex items-center gap-1.5 px-3 h-9 rounded-[10px] border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all shadow-sm" title={chain === 'Vaccine' ? 'Đăng nhập Vaccine' : (chain === 'Long Châu' ? 'Đăng nhập Long Châu' : 'Đăng nhập FPT')}>
-                       <Users size={16} />
-                       <span className="text-[13px] font-bold">{chain === 'Vaccine' ? 'Đăng nhập Vaccine' : (chain === 'Long Châu' ? 'Đăng nhập Long Châu' : 'Đăng nhập FPT')}</span>
-                   </button>
-                )}
+                {/* 2. Nút Đồng bộ */}
+                <button 
+                  type="button" 
+                  onClick={handleSync} 
+                  disabled={isSyncing} 
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all shadow-2xs disabled:opacity-75 cursor-pointer active:scale-95 ${
+                    isSyncing 
+                      ? "bg-slate-900 text-white border border-slate-800 ring-2 ring-emerald-500/20" 
+                      : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/80"
+                  }`}
+                  title={isSyncing ? `Đang tải dữ liệu ${chain || ''}... (${syncDuration}s)` : "Đồng bộ dữ liệu (Sync)"}
+                >
+                   {isSyncing ? (
+                     <CircularSpinner size={16} className="text-emerald-400" />
+                   ) : (
+                     <RefreshCw size={15} strokeWidth={2.2} />
+                   )}
+                </button>
               </div>
-              <button onClick={() => fileInputRef.current?.click()} className="w-9 h-9 flex items-center justify-center bg-blue-50 hover:bg-blue-100 hover:shadow-md hover:-translate-y-0.5 text-blue-600 rounded-[10px] transition-all duration-300 border border-blue-200 shadow-sm" title="Import Excel">
-                <UploadCloud size={17} strokeWidth={2.5} />
-              </button>
-              <button type="button" onClick={handleSync} disabled={isSyncing} className="w-9 h-9 flex items-center justify-center bg-indigo-50 hover:bg-indigo-100 hover:shadow-md hover:-translate-y-0.5 text-indigo-700 rounded-[10px] transition-all duration-300 border border-indigo-200 shadow-sm disabled:opacity-50 disabled:hover:translate-y-0" title="Đồng bộ (Sync)">
-                 <RefreshCw size={17} strokeWidth={2.5} className={isSyncing ? "animate-spin" : ""} />
-              </button>
-              <div className="relative ml-1 z-50">
-          <DatePicker
-            selectsRange={true}
-            startDate={startDate}
-            endDate={endDate}
-            onChange={(update) => setDateRange(update)}
-            dateFormat="dd/MM/yyyy"
-            className="px-3 h-9 bg-white hover:bg-slate-50 hover:shadow-md text-slate-700 rounded-[10px] text-[13px] font-bold border border-slate-200 shadow-sm w-[210px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 text-center"
-            placeholderText="Chọn ngày"
-          />
-        </div>
-            </div>,
-            document.getElementById('topbar-actions')!
+            ) : (
+              <div className="bg-slate-50/70 rounded-2xl p-2 border border-slate-200/60 shadow-[0_2px_8px_rgba(15,23,42,0.03)] flex flex-col gap-2 w-full">
+                {/* Row 1: Chọn khoảng ngày */}
+                <div className="relative" ref={datePickerRef}>
+                  <button 
+                    type="button"
+                    onClick={() => setShowDatePicker(!showDatePicker)}
+                    className="w-full flex items-center justify-between bg-white hover:bg-slate-50/90 rounded-xl border border-slate-200/80 px-2.5 py-1.5 transition-all group cursor-pointer shadow-2xs"
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Calendar size={13.5} className="text-indigo-600 shrink-0 group-hover:scale-110 transition-transform" />
+                      <span className="text-slate-700 text-[11.5px] font-bold truncate">{getFormattedDateRange()}</span>
+                    </div>
+                    <ChevronDown size={13} className={`text-slate-400 shrink-0 transition-transform duration-200 ${showDatePicker ? 'rotate-180 text-slate-700' : ''}`} />
+                  </button>
+                  
+                  {showDatePicker && (
+                    <LucianDateRangePicker
+                      filterMode={filterMode}
+                      startDate={startDate}
+                      endDate={endDate}
+                      onApply={handleApplyDateRange}
+                      onClose={() => setShowDatePicker(false)}
+                      positionClasses="absolute left-[calc(100%+14px)] -top-2"
+                    />
+                  )}
+                </div>
 
+                {/* Row 2: 3 nút icon chức năng trải đều cân đối */}
+                <div className="grid grid-cols-3 gap-1.5">
+                  {/* 1. Nút Trạng thái / Đăng nhập */}
+                  {authState?.authenticated ? (
+                     <button 
+                       onClick={handleStartAuth}
+                       className="h-8.5 rounded-xl flex items-center justify-center bg-emerald-50/90 hover:bg-emerald-100/90 text-emerald-600 border border-emerald-200/80 transition-all shadow-2xs" 
+                       title="Đã kết nối (Click để kiểm tra)"
+                     >
+                       <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse"></span>
+                     </button>
+                  ) : authState?.status === 'STARTING' || authState?.status === 'LOGIN_REQUIRED' || authState?.status === 'LOGIN_PAGE' || authState?.status === 'NAVIGATING' ? (
+                     <button 
+                       onClick={handleStartAuth} 
+                       className="h-8.5 rounded-xl flex items-center justify-center bg-amber-50 hover:bg-amber-100 text-amber-600 border border-amber-200/80 transition-all shadow-2xs" 
+                       title="Đang chờ đăng nhập... Click để mở cửa sổ"
+                     >
+                       <RefreshCw size={15} className="animate-spin text-amber-600" />
+                     </button>
+                  ) : authState?.status === 'OTP_REQUIRED' ? (
+                     <button 
+                       onClick={handleStartAuth} 
+                       className="h-8.5 rounded-xl flex items-center justify-center bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 transition-all animate-bounce shadow-2xs" 
+                       title="Cần nhập OTP trên trình duyệt Chrome"
+                     >
+                       <AlertCircle size={16} className="text-indigo-600" />
+                     </button>
+                  ) : authState?.status === 'ERROR' ? (
+                     <button 
+                       onClick={handleStartAuth} 
+                       className="h-8.5 rounded-xl flex items-center justify-center bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200/80 transition-all shadow-2xs" 
+                       title="Lỗi đăng nhập (Click để thử lại)"
+                     >
+                       <AlertCircle size={16} className="text-rose-600" />
+                     </button>
+                  ) : (
+                     <button 
+                       onClick={handleStartAuth} 
+                       className="h-8.5 rounded-xl flex items-center justify-center bg-white hover:bg-slate-100 text-slate-600 border border-slate-200/80 transition-all shadow-2xs" 
+                       title={`Đăng nhập ${chain}`}
+                     >
+                       <Users size={16} className="text-slate-600" />
+                     </button>
+                  )}
+
+                  {/* 2. Nút Import Excel */}
+                  <button 
+                    onClick={() => fileInputRef.current?.click()} 
+                    className="h-8.5 rounded-xl flex items-center justify-center bg-blue-50/90 hover:bg-blue-100/90 text-blue-600 border border-blue-200/80 transition-all shadow-2xs active:scale-95" 
+                    title="Import Excel"
+                  >
+                    <UploadCloud size={16} strokeWidth={2.3} />
+                  </button>
+
+                  {/* 3. Nút Đồng bộ */}
+                  <button 
+                    type="button" 
+                    onClick={handleSync} 
+                    disabled={isSyncing} 
+                    className={`h-8.5 rounded-xl flex items-center justify-center transition-all shadow-2xs disabled:opacity-80 active:scale-95 cursor-pointer ${
+                      isSyncing 
+                        ? "bg-slate-900 text-white border border-slate-800 ring-2 ring-emerald-500/20" 
+                        : "bg-slate-100 hover:bg-slate-200/80 text-slate-700 border border-slate-200/80"
+                    }`}
+                    title={isSyncing ? `Đang tải dữ liệu ${chain || ''}... (${syncDuration}s)` : "Đồng bộ dữ liệu (Sync)"}
+                  >
+                     {isSyncing ? (
+                       <div className="flex items-center gap-1">
+                         <CircularSpinner size={13} className="shrink-0 text-emerald-400" />
+                         <span className="text-[10.5px] font-bold tabular-nums text-emerald-400">{syncDuration}s</span>
+                       </div>
+                     ) : (
+                       <RefreshCw size={15} strokeWidth={2.2} />
+                     )}
+                  </button>
+                </div>
+              </div>
+            ),
+            document.getElementById('sidebar-actions')!
           )}
-
-
 
           {/* KPIs */}
 
@@ -650,14 +884,26 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
                       <div className="flex items-center gap-3 mb-3 relative z-10">
                         <span className="text-[14px] font-bold text-slate-500 uppercase tracking-widest">{chain === 'Long Châu' || chain === 'Vaccine' ? 'Tổng Ticket' : 'Tổng Callog'}</span>
                       </div>
-                      <div className="text-[48px] font-semibold text-slate-700 leading-none tracking-tight relative z-10">{chain === 'Long Châu' || chain?.includes('Long') ? kpiData.checked : kpiData.total}</div>
+                      <div className="text-[48px] font-semibold text-slate-700 leading-none tracking-tight relative z-10">
+                        <AnimatedNumber value={Number(chain === 'Long Châu' || chain?.includes('Long') ? kpiData.checked : kpiData.total) || 0} />
+                      </div>
                     </div>
+                    {ticketStatusStats.some(s => s.status.toLowerCase().includes('chờ') || s.status.toLowerCase().includes('cho')) && (
+                      <div className="flex-1 px-2 md:px-8 py-4 md:py-0 flex flex-col justify-center relative">
+                        <div className="flex items-center gap-3 mb-3 relative z-10">
+                          <span className="text-[14px] font-bold text-slate-500 uppercase tracking-widest">Chờ xử lý</span>
+                        </div>
+                        <div className="text-[48px] font-semibold text-slate-700 leading-none tracking-tight relative z-10">
+                          <AnimatedNumber value={Number(ticketStatusStats.find(s => s.status.toLowerCase().includes('chờ') || s.status.toLowerCase().includes('cho'))?.count || 0)} />
+                        </div>
+                      </div>
+                    )}
                     <div className="flex-1 px-2 md:px-8 py-4 md:py-0 flex flex-col justify-center relative">
                       <div className="flex items-center gap-3 mb-3 relative z-10">
                         <span className="text-[14px] font-bold text-slate-500 uppercase tracking-widest">Đang xử lý</span>
                       </div>
                       <div className="text-[48px] font-semibold text-slate-700 leading-none tracking-tight relative z-10">
-                        {ticketStatusStats.find(s => s.status.toLowerCase().includes('đang') || s.status.toLowerCase().includes('xử lý') || s.status.toLowerCase().includes('ang'))?.count || 0}
+                        <AnimatedNumber value={Number(ticketStatusStats.find(s => (s.status.toLowerCase().includes('đang') || s.status.toLowerCase().includes('dang')) && !s.status.toLowerCase().includes('chờ'))?.count || 0)} />
                       </div>
                     </div>
                     <div className="flex-1 px-2 md:px-8 py-4 md:py-0 flex flex-col justify-center relative">
@@ -665,19 +911,37 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
                         <span className="text-[14px] font-bold text-slate-500 uppercase tracking-widest">Hoàn tất</span>
                       </div>
                       <div className="text-[48px] font-semibold text-slate-700 leading-none tracking-tight relative z-10">
-                        {ticketStatusStats.find(s => s.status.toLowerCase().includes('hoàn tất') || s.status.toLowerCase().includes('ho') || s.status.toLowerCase().includes('tất'))?.count || 0}
+                        <AnimatedNumber value={Number(ticketStatusStats.find(s => s.status.toLowerCase().includes('hoàn tất') || s.status.toLowerCase().includes('hoan tat'))?.count || 0)} />
                       </div>
                     </div>
-                    {chain !== 'Vaccine' && (
-<div className="flex-1 px-2 md:px-8 py-4 md:py-0 flex flex-col justify-center relative">
-                      <div className="flex items-center gap-3 mb-3 relative z-10">
-                        <span className="text-[14px] font-bold text-slate-500 uppercase tracking-widest">Nhắc nhở</span>
+                    {chain === 'Vaccine' ? (
+                      <div 
+                        className="flex-1 px-2 md:px-8 py-4 md:py-0 flex flex-col justify-center relative cursor-default"
+                        title={`Tổng kết (Cột Y): ${kpiData.nonPenalty} Không phạt • ${kpiData.penalty} Phạt`}
+                      >
+                        <div className="flex items-center gap-3 mb-3 relative z-10">
+                          <span className="text-[14px] font-bold text-slate-500 uppercase tracking-widest">Không phạt / Phạt</span>
+                        </div>
+                        <div className="text-[36px] xl:text-[44px] font-semibold text-slate-700 leading-none tracking-tight relative z-10 flex items-baseline">
+                          <span className="text-emerald-600">
+                            <AnimatedNumber value={Number(kpiData.nonPenalty || 0)} />
+                          </span>
+                          <span className="text-slate-300 font-light text-[24px] xl:text-[30px] mx-1.5 select-none">/</span>
+                          <span className="text-slate-600">
+                            <AnimatedNumber value={Number(kpiData.penalty || 0)} />
+                          </span>
+                        </div>
                       </div>
-                      <div className="text-[48px] font-semibold text-slate-700 leading-none tracking-tight relative z-10">
-                        {kpiData.reminders}
+                    ) : (
+                      <div className="flex-1 px-2 md:px-8 py-4 md:py-0 flex flex-col justify-center relative">
+                        <div className="flex items-center gap-3 mb-3 relative z-10">
+                          <span className="text-[14px] font-bold text-slate-500 uppercase tracking-widest">Nhắc nhở</span>
+                        </div>
+                        <div className="text-[48px] font-semibold text-slate-700 leading-none tracking-tight relative z-10">
+                          <AnimatedNumber value={Number(kpiData.reminders || 0)} />
+                        </div>
                       </div>
-                    </div>
-                      )}
+                    )}
                   </>
                </GlassCard>
 

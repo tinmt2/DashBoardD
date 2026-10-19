@@ -14,11 +14,13 @@ class VaccineApiClient:
         Initialize with cookies and headers from the authenticated browser session.
         """
         self.cookies = cookies
-        self.headers = headers or {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-            "x-budibase-app-id": settings.VACCINE_APP_ID
-        }
+        self.headers = dict(headers) if headers else {}
+        if not self.headers.get("x-budibase-app-id"):
+            self.headers["x-budibase-app-id"] = settings.VACCINE_APP_ID
+        if "Accept" not in self.headers:
+            self.headers["Accept"] = "application/json"
+        if "Content-Type" not in self.headers:
+            self.headers["Content-Type"] = "application/json"
 
     def fetch_export_report(self, start_date: str, end_date: str) -> bytes:
         """

@@ -9,6 +9,7 @@ __pycache__/
 venv/
 .pytest_cache/
 _archive/
+archive/
 ag-kit-main/
 *.js
 !dashboard-app/**/*.js
@@ -20,3 +21,8 @@ restore*.js
 chunk_*.tsx
 mojibake_lines.txt
 *.log
+dist/
+dashboard-app/dist/
+.agents/
+skills-lock.json
+.DS_Store

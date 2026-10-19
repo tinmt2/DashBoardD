@@ -1,4 +1,4 @@
-﻿from datetime import date
+from datetime import date
 from pydantic import model_validator
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -83,9 +83,10 @@ class AuthStartRequest(BaseModel):
 @router.post("/auth/start", response_model=AuthStatusResponse)
 def auth_start(req: AuthStartRequest = None):
     session = FPTBrowserSession.get_instance()
+    session._initial_probed = False
     creds = {"username": req.username, "password": req.password} if req else None
     import logging
-    logging.getLogger(__name__).info(f"AUTH START CREDS RECEIVED: {creds}")
+    logging.getLogger(__name__).info(f"AUTH START USERNAME: {creds.get('username') if creds else None}")
     if creds and creds.get("username"):
         session.temp_creds = creds
     # Pass probe_only=False to ensure it's visible if needed
@@ -101,12 +102,14 @@ def auth_start(req: AuthStartRequest = None):
 def auth_status():
     session = FPTBrowserSession.get_instance()
     status = session.get_status()
-    if status == "STOPPED":
+    if status == "STOPPED" and not getattr(session, '_initial_probed', False):
+        session._initial_probed = True
         status = session.start(probe_only=True)
     return AuthStatusResponse(
         authenticated=(status == "AUTHENTICATED"),
         status=status
     )
+
 
 class SyncRequest(BaseModel):
     start_date: date
@@ -126,9 +129,11 @@ class SyncResponse(BaseModel):
     file_name: str = ""
     total_rows: int = 0
     new_records: int = 0
+    updated_records: int = 0
     duplicate_records: int = 0
     invalid_records: int = 0
     error_message: str = None
+
 
 @router.post("/sync", response_model=SyncResponse)
 def sync_fpt_shop(req: SyncRequest, db: Session = Depends(get_db)):
@@ -137,8 +142,9 @@ def sync_fpt_shop(req: SyncRequest, db: Session = Depends(get_db)):
     
     session = FPTBrowserSession.get_instance()
     status = session.get_status()
-    if status == "STOPPED" or session.driver is None:
-        status = session.start(probe_only=True)
+    if status != "AUTHENTICATED" or session.driver is None:
+        if session.driver is None:
+            status = session.start(headless=True)
         
     if status != "AUTHENTICATED" or session.driver is None:
         logger.error(f"[FPT_SYNC] Failed - FPT Shop browser session is not authenticated. Status: {status}")
@@ -146,7 +152,7 @@ def sync_fpt_shop(req: SyncRequest, db: Session = Depends(get_db)):
             success=False,
             start_date=req.start_date,
             end_date=req.end_date,
-            error_message="FPT Shop browser session is not authenticated."
+            error_message="Phiên đăng nhập FPT Shop chưa được xác thực hoặc đã hết hạn. Vui lòng bấm Đăng nhập FPT."
         )
 
     logger.info(f"[FPT_SYNC] start={req.start_date.strftime("%Y-%m-%d")} end={req.end_date.strftime("%Y-%m-%d")}")
@@ -155,8 +161,10 @@ def sync_fpt_shop(req: SyncRequest, db: Session = Depends(get_db)):
     
     try:
         driver = session.driver
-        body = f"Type=Gi%C3%A1m+s%C3%A1t+h%C3%ACnh+%E1%BA%A3nh+Camera&stepNo=-1&requestId=&Type=&Region=&sender=&timeStart={req.start_date.strftime("%d/%m/%Y")}&timeEnd={req.end_date.strftime("%d/%m/%Y")}&month_giuluong_37=&year_giuluong_37=&RegionId=&OfficeId=&TypeId=150"
+        body = f"Type=Gi%C3%A1m+s%C3%A1t+h%C3%ACnh+%E1%BA%A3nh+Camera&stepNo=-1&requestId=&Type=&Region=&sender=&timeStart={req.start_date.strftime('%Y-%m-%d')}&timeEnd={req.end_date.strftime('%Y-%m-%d')}&month_giuluong_37=&year_giuluong_37=&RegionId=&OfficeId=&TypeId=150"
         
+        logger.info(f"[FPT_SYNC] current_url={driver.current_url}")
+        driver.set_script_timeout(60)
         js_code = """
         var callback = arguments[arguments.length - 1];
         var bodyData = arguments[0];
@@ -175,30 +183,29 @@ def sync_fpt_shop(req: SyncRequest, db: Session = Depends(get_db)):
         })
         .then(r => {
             if (!r.ok) {
-                callback({status: r.status, error: "HTTP Error " + r.status});
-                return null;
+                return r.text().then(t => {
+                    callback({status: r.status, error: t});
+                }).catch(() => {
+                    callback({status: r.status, error: "HTTP Error " + r.status});
+                });
             }
             var ct = r.headers.get("content-type");
             if (ct && ct.indexOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") === -1 && ct.indexOf("excel") === -1) {
                 callback({status: 400, error: "Invalid Content-Type: " + ct});
                 return null;
             }
-            return r.blob();
-        })
-        .then(b => {
-            if (!b) return;
-            var reader = new FileReader();
-            reader.onload = function() { callback({status: 200, data: reader.result}); }
-            reader.readAsDataURL(b);
+            return r.blob().then(b => {
+                var reader = new FileReader();
+                reader.onload = function() { callback({status: 200, data: reader.result}); }
+                reader.readAsDataURL(b);
+            });
         })
         .catch(e => callback({status: 500, error: e.toString()}));
         """
-        
-        driver.set_script_timeout(60)
         result = driver.execute_async_script(js_code, body)
         
         if result.get("status") != 200:
-            error_msg = f"Failed to download Excel. Status: {result.get('status')}, Error: {result.get('error')}"
+            error_msg = f"Failed to download Excel. Status: {result.get('status')}"
             logger.error(f"[FPT_SYNC] {error_msg}")
             return SyncResponse(
                 success=False,
@@ -245,9 +252,26 @@ def sync_fpt_shop(req: SyncRequest, db: Session = Depends(get_db)):
                 error_message=commit_res.get('error_message', 'Commit failed')
             )
             
+        # Reconcile: prune any tickets in this date range that were deleted/cancelled on FPT CallLog
+        incoming_ids = [r.get("ticket_id") for r in preview_res.get("records", []) if r.get("ticket_id")]
+        if incoming_ids:
+            from app.models.ticket import Ticket
+            from sqlalchemy import func
+            deleted_q = db.query(Ticket).filter(
+                Ticket.chain == "FPT_SHOP",
+                func.date(Ticket.created_at) >= req.start_date,
+                func.date(Ticket.created_at) <= req.end_date,
+                ~Ticket.ticket_id.in_(incoming_ids)
+            )
+            pruned_count = deleted_q.delete(synchronize_session=False)
+            if pruned_count > 0:
+                db.commit()
+                logger.info(f"[FPT_SYNC] Pruned {pruned_count} deleted/cancelled tickets")
+
         summary = commit_res.get("summary", {})
         logger.info(f"[FPT_SYNC] rows={summary.get('total', 0)}")
         logger.info(f"[FPT_SYNC] inserted={summary.get('new', 0)}")
+        logger.info(f"[FPT_SYNC] updated={summary.get('updated', 0)}")
         logger.info(f"[FPT_SYNC] duplicates={summary.get('duplicate', 0)}")
         logger.info("[FPT_SYNC] complete")
         
@@ -258,6 +282,7 @@ def sync_fpt_shop(req: SyncRequest, db: Session = Depends(get_db)):
             file_name=filename,
             total_rows=summary.get("total", 0),
             new_records=summary.get("new", 0),
+            updated_records=summary.get("updated", 0),
             duplicate_records=summary.get("duplicate", 0),
             invalid_records=summary.get("invalid", 0)
         )
@@ -270,5 +295,9 @@ def sync_fpt_shop(req: SyncRequest, db: Session = Depends(get_db)):
             end_date=req.end_date,
             error_message=str(e)
         )
+    finally:
+        if getattr(session, 'is_headless', False):
+            session.stop()
+
 
 

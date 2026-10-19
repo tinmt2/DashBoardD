@@ -62,7 +62,8 @@ def vaccine_auth_start(req: Optional[AuthStartReq] = None):
 def vaccine_auth_status():
     session = VaccineBrowserSession.get_instance()
     status = session.get_status()
-    if status == "STOPPED":
+    if status == "STOPPED" and not getattr(session, '_initial_probed', False):
+        session._initial_probed = True
         status = session.start(probe_only=True)
     return {"authenticated": status == "AUTHENTICATED", "status": status}
 
@@ -70,15 +71,15 @@ def vaccine_auth_status():
 def vaccine_sync(req: SyncRequest, db: Session = Depends(get_db)):
     session = VaccineBrowserSession.get_instance()
     status = session.get_status()
-    has_cached = bool(getattr(session, "cached_cookies", None))
+    has_cached = bool(getattr(session, "cached_cookies", None) and any(k in session.cached_cookies for k in ['budibase:auth', 'bb-auth']))
     if not has_cached and (status == "STOPPED" or session.driver is None):
         status = session.start(probe_only=True)
     if status != "AUTHENTICATED":
-        raise HTTPException(status_code=401, detail="Vui long dang nhap Vaccine")
+        raise HTTPException(status_code=401, detail="Vui lòng đăng nhập Vaccine trước khi đồng bộ.")
     
     cookies = session.get_auth_cookies()
     if not cookies:
-        raise HTTPException(status_code=401, detail="Khong the lay Cookie")
+        raise HTTPException(status_code=401, detail="Không thể lấy cookie xác thực Vaccine")
         
     headers = session.get_auth_headers()
     res = sync_vaccine_data(db, cookies, headers, req.start_date, req.end_date)
@@ -90,13 +91,14 @@ def vaccine_sync(req: SyncRequest, db: Session = Depends(get_db)):
             session.status = "STOPPED"
             session._needs_storage_clear = True
             session.clear_driver()
-            raise HTTPException(status_code=401, detail="Phiên đăng nhập Vaccine đã hết hạn, vui lòng F5 và click biểu tượng chìa khóa ở góc phải trên để đăng nhập lại.")
+            raise HTTPException(status_code=401, detail="Phiên đăng nhập Vaccine đã hết hạn hoặc chưa đăng nhập, vui lòng bấm Đăng nhập Vaccine để tiếp tục.")
         raise HTTPException(status_code=500, detail=msg)
         
     return {
         "success": True,
         "start_date": req.start_date,
         "end_date": req.end_date,
+        "total_rows": res.get("total", res.get("inserted", 0) + res.get("duplicates", 0)),
         "new_records": res.get("inserted", 0),
         "duplicate_records": res.get("duplicates", 0),
         "error_message": None

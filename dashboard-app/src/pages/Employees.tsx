@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Edit2, MoveRight, ShieldAlert, X, Users, Map } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Search, Plus, Edit2, MoveRight, ShieldAlert, X } from 'lucide-react';
 import { EmployeeService } from '../services/employeeService';
 import type { Employee, Chain } from '../types';
 import { GlassCard } from '../components/common/GlassCard';
@@ -96,9 +97,7 @@ const Employees: React.FC = () => {
     try {
       const updated = await EmployeeService.updateEmployee({
         ...selectedEmployee,
-        name: formData.name,
-        position: formData.position,
-        status: formData.status
+        name: formData.name, position: formData.position, status: formData.status, startDate: formData.startDate
       });
       updateLocalEmployee(updated);
       setIsEditModalOpen(false);
@@ -124,14 +123,13 @@ const Employees: React.FC = () => {
   return (
     <div className="w-full px-8 lg:px-12 py-10 pb-16 relative z-10 animate-fade-in text-slate-800">
       
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-[32px] font-bold text-slate-900">Quản lý nhân viên</h1>
-          <p className="text-[15px] font-medium text-slate-500 mt-1">Master Data Management</p>
+          <h1 className="text-[28px] font-bold text-slate-900 tracking-tight">Quản lý nhân viên</h1>
         </div>
         <button 
           onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[12px] font-bold text-[14px] transition-colors shadow-sm"
+          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[12px] font-bold text-[14px] transition-colors shadow-sm cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           Thêm nhân viên
@@ -139,52 +137,31 @@ const Employees: React.FC = () => {
       </div>
 
       {/* Metrics (Combined Bento Grid - Compact) */}
-      <div className="w-full max-w-[1100px]">
-        <GlassCard className="flex items-center justify-between p-6 relative overflow-hidden mb-8 bg-white/60">
+      <div className="w-full max-w-[580px]">
+        <GlassCard className="flex items-center justify-between p-5 relative overflow-hidden mb-6 bg-white/60 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-200/60 rounded-2xl">
           {/* Left: Hero Metric */}
-          <div className="relative z-10 flex-1 pl-2">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm border border-emerald-200">
-                <Users size={16} strokeWidth={2.5} />
-              </div>
-              <span className="text-[14px] font-bold text-slate-500 uppercase tracking-widest">Tổng nhân sự</span>
+          <div className="relative z-10 pl-2">
+            <div className="mb-2">
+              <span className="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Tổng nhân sự</span>
             </div>
-            <div className="text-[72px] font-black text-slate-800 leading-none tracking-tighter">{metrics.total}</div>
+            <div className="text-[54px] font-black text-slate-800 leading-none tracking-tight">{metrics.total}</div>
           </div>
 
-          {/* Decorative faint icon */}
-          <Users className="absolute top-1/2 -translate-y-1/2 left-[35%] text-emerald-600/5 pointer-events-none" size={280} />
-
           {/* Right: Sub metrics */}
-          <div className="relative z-10 flex-1 max-w-[400px] flex flex-col gap-3">
-            <div className="bg-white/60 backdrop-blur-md border border-white/80 px-4 py-3 rounded-[16px] flex justify-between items-center shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
-              <div className="flex items-center gap-3">
-                <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                  <Map size={14} strokeWidth={2.5} />
-                </div>
-                <span className="text-[13px] font-bold text-slate-500 uppercase tracking-wider">FPT Shop</span>
-              </div>
-              <span className="text-[20px] font-bold text-slate-800 leading-none">{metrics.fpt}</span>
+          <div className="relative z-10 w-[240px] flex flex-col gap-2">
+            <div className="bg-white/80 backdrop-blur-md border border-slate-200/60 px-3.5 py-2 rounded-xl flex justify-between items-center shadow-2xs">
+              <span className="text-[11.5px] font-bold text-slate-500 uppercase tracking-wider">FPT Shop</span>
+              <span className="text-[16px] font-bold text-slate-800 leading-none">{metrics.fpt}</span>
             </div>
 
-            <div className="bg-white/60 backdrop-blur-md border border-white/80 px-4 py-3 rounded-[16px] flex justify-between items-center shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
-              <div className="flex items-center gap-3">
-                <div className="w-7 h-7 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
-                  <Map size={14} strokeWidth={2.5} />
-                </div>
-                <span className="text-[13px] font-bold text-slate-500 uppercase tracking-wider">Long Châu</span>
-              </div>
-              <span className="text-[20px] font-bold text-slate-800 leading-none">{metrics.longchau}</span>
+            <div className="bg-white/80 backdrop-blur-md border border-slate-200/60 px-3.5 py-2 rounded-xl flex justify-between items-center shadow-2xs">
+              <span className="text-[11.5px] font-bold text-slate-500 uppercase tracking-wider">Long Châu</span>
+              <span className="text-[16px] font-bold text-slate-800 leading-none">{metrics.longchau}</span>
             </div>
 
-            <div className="bg-white/60 backdrop-blur-md border border-white/80 px-4 py-3 rounded-[16px] flex justify-between items-center shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
-              <div className="flex items-center gap-3">
-                <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
-                  <Map size={14} strokeWidth={2.5} />
-                </div>
-                <span className="text-[13px] font-bold text-slate-500 uppercase tracking-wider">Vaccine</span>
-              </div>
-              <span className="text-[20px] font-bold text-slate-800 leading-none">{metrics.vaccine}</span>
+            <div className="bg-white/80 backdrop-blur-md border border-slate-200/60 px-3.5 py-2 rounded-xl flex justify-between items-center shadow-2xs">
+              <span className="text-[11.5px] font-bold text-slate-500 uppercase tracking-wider">Vaccine</span>
+              <span className="text-[16px] font-bold text-slate-800 leading-none">{metrics.vaccine}</span>
             </div>
           </div>
         </GlassCard>
@@ -199,13 +176,13 @@ const Employees: React.FC = () => {
             placeholder="Tìm kiếm theo Mail, họ tên..." 
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 rounded-[12px] border border-slate-200 bg-white/80 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-[14px]"
+            className="w-full pl-9 pr-4 py-2 rounded-[12px] border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-[14px]"
           />
         </div>
         <select 
           value={chainFilter}
           onChange={e => setChainFilter(e.target.value as any)}
-          className="px-4 py-2 rounded-[12px] border border-slate-200 bg-white/80 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-[14px] font-medium"
+          className="px-4 py-2 rounded-[12px] border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-[14px] font-medium"
         >
           <option value="All">Tất cả chuỗi</option>
           <option value="FPT Shop">FPT Shop</option>
@@ -216,7 +193,7 @@ const Employees: React.FC = () => {
         <select 
           value={sortBy}
           onChange={e => setSortBy(e.target.value as any)}
-          className="px-4 py-2 rounded-[12px] border border-slate-200 bg-white/80 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-[14px] font-medium ml-auto"
+          className="px-4 py-2 rounded-[12px] border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-[14px] font-medium ml-auto"
         >
           <option value="id">Sắp xếp theo Mail</option>
           <option value="chain">Sắp xếp theo Chuỗi</option>
@@ -233,6 +210,7 @@ const Employees: React.FC = () => {
                 <th className="px-6 py-4 text-[13px] font-bold text-slate-500 uppercase tracking-wider">Mail</th>
                 <th className="px-6 py-4 text-[13px] font-bold text-slate-500 uppercase tracking-wider">Họ và tên</th>
                 <th className="px-6 py-4 text-[13px] font-bold text-slate-500 uppercase tracking-wider">Chuỗi</th>
+                  <th className="px-6 py-4 text-[13px] font-bold text-slate-500 uppercase tracking-wider">Thâm niên</th>
                 <th className="px-6 py-4 text-[13px] font-bold text-slate-500 uppercase tracking-wider text-right">Thao tác</th>
               </tr>
             </thead>
@@ -259,10 +237,13 @@ const Employees: React.FC = () => {
                         {emp.chain}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-[14px] font-medium text-slate-600">
+                        {emp.startDate ? Math.max(0, Math.floor((Date.now() - new Date(emp.startDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44))) + ' tháng' : '-'}
+                      </td>
+                      <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
                         <button
-                          onClick={() => { setSelectedEmployee(emp); setFormData({...formData, name: emp.name, position: emp.position || '', status: emp.status}); setIsEditModalOpen(true); }}
+                          onClick={() => { setSelectedEmployee(emp); setFormData({...formData, name: emp.name, position: emp.position || '', status: emp.status, startDate: emp.startDate || ''}); setIsEditModalOpen(true); }}
                           className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                           title="Chỉnh sửa"
                         >
@@ -292,8 +273,8 @@ const Employees: React.FC = () => {
       </GlassCard>
 
       {/* Add Employee Modal */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+      {isAddModalOpen && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-[24px] p-8 w-full max-w-md shadow-2xl">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-slate-900">Thêm nhân viên mới</h2>
@@ -309,31 +290,36 @@ const Employees: React.FC = () => {
             <form onSubmit={handleAddSubmit} className="space-y-4">
               <div>
                 <label className="block text-[13px] font-bold text-slate-700 mb-1">Mail *</label>
-                <input required type="text" value={formData.id} onChange={e => setFormData({...formData, id: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500/50 outline-none"/>
+                <input required type="text" value={formData.id} onChange={e => setFormData({...formData, id: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500/50 outline-none"/>
               </div>
               <div>
                 <label className="block text-[13px] font-bold text-slate-700 mb-1">Họ và tên *</label>
-                <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500/50 outline-none"/>
+                <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500/50 outline-none"/>
               </div>
               <div>
                 <label className="block text-[13px] font-bold text-slate-700 mb-1">Chuỗi *</label>
-                <select required value={formData.chain} onChange={e => setFormData({...formData, chain: e.target.value as Chain})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500/50 outline-none">
+                <select required value={formData.chain} onChange={e => setFormData({...formData, chain: e.target.value as Chain})} className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500/50 outline-none">
                   {CHAINS.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
-              </div>
-              
-              <div className="flex gap-3 justify-end mt-8">
+                </div>
+                <div>
+                  <label className="block text-[13px] font-bold text-slate-700 mb-1">Ngày bắt đầu</label>
+                  <input type="date" value={formData.startDate || ''} onChange={e => setFormData({...formData, startDate: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500/50 outline-none"/>
+                </div>
+                
+                <div className="flex gap-3 justify-end mt-8">
                 <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-5 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 transition-colors">Hủy</button>
                 <button type="submit" className="px-5 py-2.5 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-sm">Thêm nhân viên</button>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Edit Employee Modal */}
-      {isEditModalOpen && selectedEmployee && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+      {isEditModalOpen && selectedEmployee && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-[24px] p-8 w-full max-w-md shadow-2xl">
             <h2 className="text-xl font-bold text-slate-900 mb-6">Chỉnh sửa nhân viên</h2>
             {isDeleteConfirmOpen ? (
@@ -372,9 +358,13 @@ const Employees: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-[13px] font-bold text-slate-700 mb-1">Họ và tên *</label>
-                  <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500/50 outline-none"/>
+                  <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500/50 outline-none"/>
                 </div>
-                <div className="flex gap-3 justify-between mt-8">
+                  <div>
+                    <label className="block text-[13px] font-bold text-slate-700 mb-1">Ngày bắt đầu</label>
+                    <input type="date" value={formData.startDate || ''} onChange={e => setFormData({...formData, startDate: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500/50 outline-none"/>
+                  </div>
+                  <div className="flex gap-3 justify-between mt-8">
                   <button
                     type="button"
                     onClick={() => setIsDeleteConfirmOpen(true)}
@@ -390,12 +380,13 @@ const Employees: React.FC = () => {
               </form>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Move Employee Modal */}
-      {isMoveModalOpen && selectedEmployee && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+      {isMoveModalOpen && selectedEmployee && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-[24px] p-8 w-full max-w-md shadow-2xl">
             <h2 className="text-xl font-bold text-slate-900 mb-6">CHUYỂN CHUỖI</h2>
             
@@ -439,7 +430,8 @@ const Employees: React.FC = () => {
               <button onClick={handleMoveSubmit} className="px-5 py-2.5 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm">Xác nhận chuyển</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
     </div>

@@ -1,6 +1,6 @@
 import { LongChauDashboardResponse } from '../types/longChauDashboard';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8000`;
+const API_BASE_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'file:' ? 'http://127.0.0.1:8000' : (window.location.port === '5174' ? `http://${window.location.hostname}:8000` : window.location.origin));
 
 export const fetchLongChauSummary = async (
   fromDate?: string,

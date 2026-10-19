@@ -1,4 +1,6 @@
 import uuid
+import re
+import unicodedata
 from datetime import datetime, timezone
 from typing import Dict, Any
 from app.services.importers.fpt_shop.date_parser import FPTShopDateParser
@@ -71,7 +73,7 @@ class RowNormalizer:
             "error_type": error_type,
             "error_reason": str(self.get_value(row, mapping, "error_reason") or "").strip() or None,
             "ticket_status": str(self.get_value(row, mapping, "ticket_status") or "").strip() or None,
-            "note": str(self.get_value(row, mapping, "note") or "").strip() or None,
+            "note": unicodedata.normalize('NFC', re.sub(r'\s+', ' ', str(self.get_value(row, mapping, "note") or ""))).strip() or None,
             "source": "EXCEL",
             "imported_at": datetime.now(timezone.utc)
         }

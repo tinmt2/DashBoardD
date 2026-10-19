@@ -38,22 +38,27 @@ PREFERRED_SHEET_NAME = "SHEET 1"
 
 
 def build_dedup_key(chain: str, ticket_id: Optional[str], error_type: Optional[str],
-                    error_description: Optional[str]) -> str:
+                    error_description: Optional[str], employee: Optional[str] = None,
+                    summary: Optional[str] = None) -> str:
     """Identity of one Vaccine violation.
 
-    One MÃ YÊU CẦU can legitimately contain several violations (the real
-    export has 59 request IDs spanning 2–4 rows, each with a different
-    LOẠI LỖI / MÔ TẢ LỖI / HÌNH LỖI). Keying on ``chain + MÃ YÊU CẦU`` alone
-    would silently drop those violations, so the key is
-    ``chain + MÃ YÊU CẦU + LOẠI LỖI + MÔ TẢ LỖI`` (same identity idea as the
-    existing FPT ``TicketDeduplicator``: ticket_id + error_type + error_reason).
+    Keying on chain + ticket_id + error_type + error_description + employee + summary.
+    This ensures that multiple employees penalised on the same ticket or differing
+    summaries (e.g. Phạt vs Không phạt) are not incorrectly dropped as duplicates.
     Values are NFC-normalized and whitespace-collapsed only for hashing; the
     stored values remain verbatim.
     """
     def norm(v: Optional[str]) -> str:
         return " ".join(unicodedata.normalize("NFC", v or "").split())
 
-    payload = "\x1f".join([norm(chain), norm(ticket_id), norm(error_type), norm(error_description)])
+    payload = "\x1f".join([
+        norm(chain),
+        norm(ticket_id),
+        norm(error_type),
+        norm(error_description),
+        norm(employee),
+        norm(summary),
+    ])
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -147,7 +152,14 @@ class VaccineExcelImporter:
         for prow in sheet.rows:
             mapped = self.mapper.map_row(prow.row_number, prow.values, mapping)
             validation = self.validator.validate(mapped)
-            key = build_dedup_key(CHAIN_VACCINE, mapped.ticket_id, mapped.error_type, mapped.error_description)
+            key = build_dedup_key(
+                CHAIN_VACCINE,
+                mapped.ticket_id,
+                mapped.error_type,
+                mapped.error_description,
+                mapped.employee_raw,
+                mapped.summary,
+            )
             arow = AnalyzedRow(mapped=mapped, validation=validation, dedup_key=key)
 
             # In-file duplicates only matter for rows that would be committed.

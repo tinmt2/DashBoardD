@@ -50,18 +50,25 @@ def long_chau_import_history(limit: int = 100, db: Session = Depends(get_db)):
     limit = max(1, min(limit, 500))
     return {"success": True, "history": LongChauImportService(db).history(limit)}
 
+from typing import Optional
 from app.services.long_chau.login.browser_session import LongChauBrowserSession
 from app.services.long_chau.api.client import LongChauApiClient
 from app.services.long_chau.api.sync_db import save_long_chau_api_records
 from pydantic import BaseModel
+
+class AuthStartReq(BaseModel):
+    username: str = ""
+    password: str = ""
 
 class SyncRequest(BaseModel):
     start_date: str
     end_date: str
 
 @router.post("/auth/start")
-def long_chau_auth_start():
+def long_chau_auth_start(req: Optional[AuthStartReq] = None):
     session = LongChauBrowserSession.get_instance()
+    if req:
+        session.temp_creds = req.dict()
     status = session.start()
     return {"authenticated": status == "AUTHENTICATED", "status": status}
 
@@ -69,7 +76,8 @@ def long_chau_auth_start():
 def long_chau_auth_status():
     session = LongChauBrowserSession.get_instance()
     status = session.get_status()
-    if status == "STOPPED":
+    if status == "STOPPED" and not getattr(session, '_initial_probed', False):
+        session._initial_probed = True
         status = session.start(probe_only=True)
     return {"authenticated": status == "AUTHENTICATED", "status": status}
 
@@ -77,8 +85,8 @@ def long_chau_auth_status():
 def long_chau_sync(req: SyncRequest, db: Session = Depends(get_db)):
     session = LongChauBrowserSession.get_instance()
     status = session.get_status()
-    # Check if we have cached cookies first so we don't wake up Chrome unnecessarily!
-    has_cached = bool(getattr(session, "cached_cookies", None))
+    # Check if we have cached cookies first with budibase:auth or bb-auth
+    has_cached = bool(getattr(session, "cached_cookies", None) and any(k in session.cached_cookies for k in ['budibase:auth', 'bb-auth']))
     if not has_cached and (status == "STOPPED" or session.driver is None):
         status = session.start(probe_only=True)
     if status != "AUTHENTICATED":
@@ -88,10 +96,9 @@ def long_chau_sync(req: SyncRequest, db: Session = Depends(get_db)):
     if not cookies:
         raise HTTPException(status_code=401, detail="Không lấy được Cookie đăng nhập Long Châu.")
         
-    client = LongChauApiClient(cookies)
+    client = LongChauApiClient(cookies, headers=session.get_auth_headers() if hasattr(session, 'get_auth_headers') else None)
     try:
-        # In the future, we will process this data and save to DB
-        # For now, just fetch it and return count
+        # Fetch data from Budibase API
         records = client.get_full_report(req.start_date, req.end_date)
         # Process and save
         inserted, duplicates = save_long_chau_api_records(db, records)
@@ -105,4 +112,12 @@ def long_chau_sync(req: SyncRequest, db: Session = Depends(get_db)):
             "error_message": None
         }
     except Exception as e:
+        msg = str(e)
+        if "403" in msg or "401" in msg or "not authenticated" in msg.lower() or "Forbidden" in msg or "Unauthorized" in msg:
+            session.cached_cookies = None
+            session.cached_headers = None
+            session.status = "STOPPED"
+            session._needs_storage_clear = True
+            session.clear_driver()
+            raise HTTPException(status_code=401, detail="Phiên đăng nhập Long Châu đã hết hạn, vui lòng bấm Đăng nhập Long Châu để tiếp tục.")
         raise HTTPException(status_code=500, detail=str(e))

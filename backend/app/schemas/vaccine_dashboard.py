@@ -40,6 +40,9 @@ class VaccineDashboardData(BaseModel):
     employeesWithErrors: int
     totalShops: int
     totalReminders: int = 0
+    nonPenaltyCount: int = 0
+    penaltyCount: int = 0
+    summaryStats: List[Dict[str, Any]] = []
     chainStats: VaccineChainStats
     errorTypeStats: List[VaccineErrorTypeStat]
     employeeErrorRanking: List[VaccineEmployeeStat]

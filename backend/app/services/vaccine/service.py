@@ -19,6 +19,7 @@ from typing import Any, Dict, Iterable, List, Set
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.models.ticket import Ticket
 from app.models.vaccine import VaccineImportJob, VaccineTicketDetail
 from app.repositories.ticket_repository import SQLiteTicketRepository
 from app.schemas.ticket import CHAIN_VACCINE, TicketRecord
@@ -191,18 +192,40 @@ class VaccineImportService:
             duplicate_count = 0
             for p in payload:
                 key = p["dedup_key"]
+                d = p["detail"]
+                rec_data = dict(p["record"])
                 if key in existing or key in seen:
                     duplicate_count += 1
+                    if key in existing:
+                        existing_detail = self.db.query(VaccineTicketDetail).filter(VaccineTicketDetail.dedup_key == key).first()
+                        if existing_detail:
+                            if d.get("summary") is not None:
+                                existing_detail.summary = d.get("summary")
+                            if d.get("step_status") is not None:
+                                existing_detail.step_status = d.get("step_status")
+                            if d.get("step") is not None:
+                                existing_detail.step = d.get("step")
+                            if d.get("punishment") is not None:
+                                existing_detail.punishment = d.get("punishment")
+                            if d.get("vaccine_type") is not None:
+                                existing_detail.vaccine_type = d.get("vaccine_type")
+                            if d.get("violation_content") is not None:
+                                existing_detail.violation_content = d.get("violation_content")
+                            if rec_data.get("ticket_status") or rec_data.get("error_status"):
+                                existing_ticket = self.db.query(Ticket).filter(Ticket.id == existing_detail.ticket_record_id).first()
+                                if existing_ticket:
+                                    if rec_data.get("ticket_status"):
+                                        existing_ticket.ticket_status = rec_data.get("ticket_status")
+                                    if rec_data.get("error_status"):
+                                        existing_ticket.error_status = rec_data.get("error_status")
                     continue
                 seen.add(key)
 
-                rec_data = dict(p["record"])
                 rec_data["chain"] = CHAIN_VACCINE  # enforce, regardless of stored payload
                 rec_data["imported_at"] = committed_at
                 record = TicketRecord(**rec_data)
                 records.append(record)
 
-                d = p["detail"]
                 details.append(VaccineTicketDetail(
                     ticket_record_id=record.id,
                     chain=CHAIN_VACCINE,
@@ -218,9 +241,15 @@ class VaccineImportService:
                     asm=d.get("asm"),
                     camera_count=d.get("camera_count"),
                     evidence_urls=d.get("evidence_urls"),
+                    vaccine_type=d.get("vaccine_type"),
+                    violation_content=d.get("violation_content"),
+                    punishment=d.get("punishment"),
                     employee_raw=d.get("employee_raw"),
                     requested_date=date.fromisoformat(d["requested_date"]) if d.get("requested_date") else None,
                     step_status=d.get("step_status"),
+                    summary=d.get("summary"),
+                    video_urls=d.get("video_urls"),
+                    injection_ticket_code=d.get("injection_ticket_code"),
                     import_id=job.id,
                     source_row=d.get("source_row"),
                 ))

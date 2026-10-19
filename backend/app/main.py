@@ -10,12 +10,12 @@ async def lifespan(app: FastAPI):
     session.stop()
 
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import health, fpt_shop, long_chau
 from app.core.logging import setup_logging
 from app.core.database import engine, Base
 import app.models.ticket
 import app.models.import_job
 import app.models.long_chau
+import app.models.notification
 
 Base.metadata.create_all(bind=engine)
 
@@ -31,7 +31,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from app.api import health, fpt_shop, long_chau, long_chau_dashboard, vaccine, vaccine_dashboard
+from app.api import health, fpt_shop, long_chau, long_chau_dashboard, vaccine, vaccine_dashboard, notifications
 
 app.include_router(health.router, prefix="/api")
 app.include_router(fpt_shop.router, prefix="/api/fpt-shop")
@@ -39,7 +39,28 @@ app.include_router(long_chau.router, prefix="/api/long-chau")
 app.include_router(long_chau_dashboard.router, prefix="/api")
 app.include_router(vaccine.router, prefix="/api/vaccine")
 app.include_router(vaccine_dashboard.router, prefix="/api")
+app.include_router(notifications.router, prefix="/api/notifications")
 
-@app.get("/")
-def read_root():
-    return {"message": "OpsMonitor API is running"}
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
+
+frontend_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "dashboard-app", "dist"))
+
+if os.path.exists(frontend_dist):
+    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="assets")
+    
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        if full_path.startswith("api/"):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="API route not found")
+        
+        file_path = os.path.join(frontend_dist, full_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(frontend_dist, "index.html"))
+else:
+    @app.get("/")
+    def read_root():
+        return {"message": "OpsMonitor API is running (Frontend dist not found)"}

@@ -913,13 +913,24 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse"></span>
                      </button>
                   ) : authState?.status === 'STARTING' || authState?.status === 'LOGIN_REQUIRED' || authState?.status === 'LOGIN_PAGE' || authState?.status === 'NAVIGATING' ? (
-                     <button 
-                       onClick={handleStartAuth} 
-                       className="h-8.5 rounded-xl flex items-center justify-center bg-amber-50 hover:bg-amber-100 text-amber-600 border border-amber-200/80 transition-all shadow-2xs" 
-                       title="Đang chờ đăng nhập... Click để mở cửa sổ"
-                     >
-                       <RefreshCw size={15} className="animate-spin text-amber-600" />
-                     </button>
+                      <div className="flex items-center gap-1">
+                        <button 
+                          onClick={handleStartAuth} 
+                          className="h-8.5 px-2.5 rounded-xl flex items-center justify-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-600 border border-amber-200/80 transition-all shadow-2xs cursor-pointer" 
+                          title="Đang chờ đăng nhập... Click để kiểm tra lại"
+                        >
+                          <RefreshCw size={14} className="animate-spin text-amber-600" />
+                          <span className="text-[11px] font-semibold text-amber-700">Đang chờ</span>
+                        </button>
+                        <button 
+                          onClick={() => setShowOtpModal(true)} 
+                          className="h-8.5 px-2.5 rounded-xl flex items-center justify-center gap-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 transition-all shadow-2xs cursor-pointer" 
+                          title="Nhập mã OTP trực tiếp"
+                        >
+                          <KeyRound size={14} className="text-indigo-600" />
+                          <span className="text-[11px] font-bold text-indigo-700">OTP</span>
+                        </button>
+                      </div>
                   ) : authState?.status === 'OTP_REQUIRED' ? (
                      <button 
                        onClick={() => setShowOtpModal(true)} 
@@ -1093,10 +1104,19 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
                  <span className="flex items-center gap-1.5 text-[13px] font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div> Connected
                  </span>
-              ) : authState?.status === 'STARTING' || authState?.status === 'LOGIN_REQUIRED' || authState?.status === 'LOGIN_PAGE' || authState?.status === 'NAVIGATING' ? (
-                 <button onClick={handleStartAuth} className="flex items-center gap-1.5 text-[13px] font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer">
-                   <RefreshCw size={14} className="animate-spin" /> Đang chờ đăng nhập...
+              ) : authState?.status === 'OTP_REQUIRED' ? (
+                 <button onClick={() => setShowOtpModal(true)} className="flex items-center gap-2 text-[14px] font-bold text-indigo-700 bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-200 hover:bg-indigo-100 transition-all cursor-pointer shadow-sm animate-pulse">
+                   <KeyRound size={16} className="text-indigo-600" /> Nhập mã OTP (Authy)
                  </button>
+              ) : authState?.status === 'STARTING' || authState?.status === 'LOGIN_REQUIRED' || authState?.status === 'LOGIN_PAGE' || authState?.status === 'NAVIGATING' ? (
+                 <div className="flex items-center gap-2">
+                   <button onClick={handleStartAuth} className="flex items-center gap-1.5 text-[13px] font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer" title="Click để thử đăng nhập lại">
+                     <RefreshCw size={14} className="animate-spin" /> Đang chờ đăng nhập...
+                   </button>
+                   <button onClick={() => setShowOtpModal(true)} className="flex items-center gap-1.5 text-[13px] font-bold text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-200 hover:bg-indigo-100 transition-colors cursor-pointer">
+                     <KeyRound size={14} className="text-indigo-600" /> Nhập OTP
+                   </button>
+                 </div>
               ) : authState?.status === 'ERROR' ? (
                  <button onClick={handleStartAuth} className="flex items-center gap-1.5 text-[13px] font-bold text-rose-600 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-200 hover:bg-rose-100 transition-colors">
                      Lỗi đăng nhập (Thử lại)

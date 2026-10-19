@@ -113,7 +113,12 @@ class VaccineBrowserSession(BaseBrowserSession):
                     except: pass
                     
                     page_source = self.driver.page_source.lower()
-                    if "vui lòng nhập mã otp" in page_source or "mã xác thực không hợp lệ" in page_source or "mã xác nhận không đúng" in page_source:
+                    has_otp_field = False
+                    try:
+                        has_otp_field = bool(self.driver.find_elements(By.NAME, "LoginInput.Otp") or self.driver.find_elements(By.CLASS_NAME, "input-otp"))
+                    except: pass
+
+                    if has_otp_field or "vui lòng nhập mã otp" in page_source or "mã xác thực không hợp lệ" in page_source or "mã xác nhận không đúng" in page_source:
                         self.status = "OTP_REQUIRED"
                         try: self.driver.maximize_window()
                         except: pass

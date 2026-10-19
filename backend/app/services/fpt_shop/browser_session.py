@@ -150,9 +150,14 @@ class FPTBrowserSession(BaseBrowserSession):
                         pass
 
                     page_source = self.driver.page_source.lower()
+                    has_otp_field = False
+                    try:
+                        has_otp_field = bool(self.driver.find_elements(By.NAME, "LoginInput.Otp") or self.driver.find_elements(By.CLASS_NAME, "input-otp"))
+                    except: pass
+
                     if "tài khoản hoặc mật khẩu không chính xác" in page_source:
                         self.status = "LOGIN_FAILED"
-                    elif "vui lòng nhập mã otp" in page_source or "mã xác thực không hợp lệ" in page_source or "mã xác nhận không đúng" in page_source:
+                    elif has_otp_field or "vui lòng nhập mã otp" in page_source or "mã xác thực không hợp lệ" in page_source or "mã xác nhận không đúng" in page_source:
                         self.status = "OTP_REQUIRED"
                         self._force_show_window()
                     else:

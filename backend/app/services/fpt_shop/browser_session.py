@@ -2,6 +2,7 @@ import os
 import threading
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
 import logging
 from app.services.browser.browser_manager import BaseBrowserSession
 
@@ -140,37 +141,55 @@ class FPTBrowserSession(BaseBrowserSession):
                         pass
 
                     page_source = self.driver.page_source.lower()
-                    if "vui lòng nhập mã otp" in page_source or "mã xác thực không hợp lệ" in page_source or "mã xác nhận không đúng" in page_source:
+                    if "tài khoản hoặc mật khẩu không chính xác" in page_source:
+                        self.status = "LOGIN_FAILED"
+                    elif "vui lòng nhập mã otp" in page_source or "mã xác thực không hợp lệ" in page_source or "mã xác nhận không đúng" in page_source:
                         self.status = "OTP_REQUIRED"
                         self._force_show_window()
                     else:
                         self.status = "LOGIN_PAGE"
 
                 elif "calllog.fptshop.com.vn/report/debtconfirm" in url and "login" not in url and "identity" not in url:
-                    self.status = "AUTHENTICATED"
-                    self._force_minimize_window()
+                    cookies_dict = {}
+                    try:
+                        cookies_dict = {c['name']: c['value'] for c in self.driver.get_cookies()}
+                    except: pass
                     
-                    # Close the visible browser window after completing authentication so it doesn't linger on screen
-                    def switch_headless():
-                        try:
-                            import time
-                            time.sleep(1.0)
-                            driver_to_quit = None
-                            with self._lock:
-                                if self.driver and not getattr(self, 'is_headless', False):
-                                    driver_to_quit = self.driver
-                                    self.clear_driver()
-                            if driver_to_quit:
-                                try:
-                                    driver_to_quit.quit()
-                                except Exception:
-                                    pass
-                        except Exception:
-                            pass
+                    is_report_loaded = False
+                    try:
+                        is_report_loaded = bool(self.driver.find_elements(By.NAME, "timeStart") or self.driver.find_elements(By.ID, "timeStart") or "chi tiết thiết bị" in self.driver.page_source.lower() or "giám sát" in self.driver.page_source.lower())
+                    except: pass
                     
-                    if not getattr(self, '_closing_thread_started', False) and not getattr(self, 'is_headless', False):
-                        self._closing_thread_started = True
-                        threading.Thread(target=switch_headless, daemon=True).start()
+                    has_auth_cookie = any(k in cookies_dict for k in ['.AspNet', '.AspNetCore', 'idsrv', 'calllog'])
+                    
+                    if is_report_loaded or has_auth_cookie:
+                        self.status = "AUTHENTICATED"
+                        self._force_minimize_window()
+                        
+                        # Close the visible browser window after completing authentication so it doesn't linger on screen
+                        def switch_headless():
+                            try:
+                                import time
+                                time.sleep(1.0)
+                                driver_to_quit = None
+                                with self._lock:
+                                    if self.driver and not getattr(self, 'is_headless', False):
+                                        driver_to_quit = self.driver
+                                        self.clear_driver()
+                                if driver_to_quit:
+                                    try:
+                                        driver_to_quit.quit()
+                                    except Exception:
+                                        pass
+                            except Exception:
+                                pass
+                        
+                        if not getattr(self, '_closing_thread_started', False) and not getattr(self, 'is_headless', False):
+                            self._closing_thread_started = True
+                            threading.Thread(target=switch_headless, daemon=True).start()
+                    else:
+                        # Page is still in transit / redirecting
+                        self.status = "STARTING"
 
                 elif "accounts.google.com" in url or "login.microsoftonline.com" in url:
                     self.status = "OTP_REQUIRED"

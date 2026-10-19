@@ -93,6 +93,16 @@ def auth_start(req: AuthStartRequest = None):
     status = session.start(probe_only=False)
     if status == "ERROR":
         raise HTTPException(status_code=500, detail="Browser failed to start")
+        
+    # If credentials were provided, give the browser up to 3 seconds to auto-submit and redirect
+    if creds and creds.get("username") and creds.get("password"):
+        import time
+        for _ in range(6):
+            time.sleep(0.5)
+            status = session.get_status()
+            if status in ("AUTHENTICATED", "LOGIN_FAILED", "OTP_REQUIRED"):
+                break
+
     return AuthStatusResponse(
         authenticated=(status == "AUTHENTICATED"),
         status=status
@@ -145,6 +155,10 @@ def sync_fpt_shop(req: SyncRequest, db: Session = Depends(get_db)):
     if status != "AUTHENTICATED" or session.driver is None:
         if session.driver is None:
             status = session.start(headless=True)
+            if status != "AUTHENTICATED":
+                import time
+                time.sleep(1.5)
+                status = session.get_status()
         
     if status != "AUTHENTICATED" or session.driver is None:
         logger.error(f"[FPT_SYNC] Failed - FPT Shop browser session is not authenticated. Status: {status}")
@@ -155,7 +169,7 @@ def sync_fpt_shop(req: SyncRequest, db: Session = Depends(get_db)):
             error_message="Phiên đăng nhập FPT Shop chưa được xác thực hoặc đã hết hạn. Vui lòng bấm Đăng nhập FPT."
         )
 
-    logger.info(f"[FPT_SYNC] start={req.start_date.strftime("%Y-%m-%d")} end={req.end_date.strftime("%Y-%m-%d")}")
+    logger.info(f"[FPT_SYNC] start={req.start_date.strftime('%Y-%m-%d')} end={req.end_date.strftime('%Y-%m-%d')}")
     logger.info("[FPT_SYNC] authenticated=true")
     logger.info("[FPT_SYNC] requesting GetDebtReportExcel")
     
@@ -168,17 +182,26 @@ def sync_fpt_shop(req: SyncRequest, db: Session = Depends(get_db)):
         js_code = """
         var callback = arguments[arguments.length - 1];
         var bodyData = arguments[0];
-        fetch("https://calllog.fptshop.com.vn/Report/GetDebtReportExcel", {
-          "headers": {
+        var token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+        var headers = {
             "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
             "accept-language": "vi,en-US;q=0.9,en;q=0.8",
             "cache-control": "max-age=0",
             "content-type": "application/x-www-form-urlencoded",
-            "upgrade-insecure-requests": "1"
-          },
-          "body": bodyData,
+            "upgrade-insecure-requests": "1",
+            "X-Requested-With": "XMLHttpRequest"
+        };
+        if (token) {
+            headers["RequestVerificationToken"] = token;
+        }
+        var fullBody = bodyData;
+        if (token && fullBody.indexOf('__RequestVerificationToken') === -1) {
+            fullBody += '&__RequestVerificationToken=' + encodeURIComponent(token);
+        }
+        fetch("https://calllog.fptshop.com.vn/Report/GetDebtReportExcel", {
+          "headers": headers,
+          "body": fullBody,
           "method": "POST",
-          "mode": "cors",
           "credentials": "include"
         })
         .then(r => {
@@ -206,12 +229,13 @@ def sync_fpt_shop(req: SyncRequest, db: Session = Depends(get_db)):
         
         if result.get("status") != 200:
             status_code = result.get("status")
+            error_detail = str(result.get("error", ""))[:200]
             if status_code in (401, 403):
                 session.status = "LOGIN_PAGE"
-                error_msg = "Phiên làm việc FPT Shop chưa được xác thực hoặc đã hết hạn (Mã 403). Vui lòng bấm 'Đăng nhập FPT' để đăng nhập lại."
+                error_msg = f"Phiên làm việc FPT Shop chưa được xác thực hoặc đã hết hạn (Mã {status_code}). Vui lòng bấm 'Đăng nhập FPT' để đăng nhập lại."
             else:
                 error_msg = f"Failed to download Excel. Status: {status_code}"
-            logger.error(f"[FPT_SYNC] {error_msg}")
+            logger.error(f"[FPT_SYNC] {error_msg} - Detail: {error_detail}")
             return SyncResponse(
                 success=False,
                 start_date=req.start_date,

@@ -1,19 +1,7 @@
-# Stage 1: Build Frontend React
-FROM node:20-slim AS frontend-builder
-WORKDIR /frontend
-
-# Copy dependencies definitions
-COPY dashboard-app/package*.json ./
-RUN npm install
-
-# Copy source code and build
-COPY dashboard-app/ ./
-RUN npm run build
-
-# Stage 2: Backend & Google Chrome Environment
+# Backend Environment with Google Chrome for Railway
 FROM python:3.12-slim
 
-# Cài đặt các gói phụ thuộc cần thiết cho Google Chrome
+# Cài đặt các gói phụ thuộc cho Google Chrome
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     curl \
@@ -47,28 +35,20 @@ RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --d
     && apt-get install -y --no-install-recommends google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
 
-# Thiết lập user chuẩn cho Hugging Face Spaces (UID 1000)
-RUN useradd -m -u 1000 user
-USER user
-ENV HOME=/home/user \
-    PATH=/home/user/.local/bin:$PATH \
-    PYTHONUNBUFFERED=1
+ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Cài đặt các thư viện Python
-COPY --chown=user:user backend/requirements.txt /app/requirements.txt
+# Cài đặt các thư viện Python cho Backend
+COPY backend/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
-# Copy toàn bộ code backend
-COPY --chown=user:user backend /app/backend
-
-# Copy bản build frontend từ Stage 1
-COPY --chown=user:user --from=frontend-builder /frontend/dist /app/dashboard-app/dist
+# Copy mã nguồn Backend
+COPY backend /app/backend
 
 WORKDIR /app/backend
 
-# Hugging Face Spaces yêu cầu mở cổng 7860
-EXPOSE 7860
+# Mở cổng theo biến PORT của Railway (mặc định 8000 nếu không có)
+EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

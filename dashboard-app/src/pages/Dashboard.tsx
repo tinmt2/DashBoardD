@@ -5,7 +5,7 @@ import { useSync } from '../context/SyncContext';
 
 import { createPortal } from 'react-dom';
 
-import { ChevronDown, RefreshCw, AlertCircle, UploadCloud, CheckCircle2, X, Activity, Users, Calendar, Clock } from 'lucide-react';
+import { ChevronDown, RefreshCw, AlertCircle, UploadCloud, CheckCircle2, X, Activity, Users, Calendar, Clock, KeyRound } from 'lucide-react';
 
 import type { Chain, Employee } from '../types';
 
@@ -14,8 +14,8 @@ import { AnimatedNumber } from '../components/common/AnimatedNumber';
 import { useSidebar } from '../components/layout/Layout';
 
 import { EmployeeService } from '../services/employeeService';
-import { fetchVaccineSummary, previewVaccineImport, commitVaccineImport, startVaccineAuth, getVaccineAuthStatus, syncVaccine } from '../services/vaccineApi';
-import { fetchLongChauSummary, previewLongChauImport, commitLongChauImport, startLongChauAuth, getLongChauAuthStatus, syncLongChau } from '../services/longChauApi';
+import { fetchVaccineSummary, previewVaccineImport, commitVaccineImport, startVaccineAuth, getVaccineAuthStatus, syncVaccine, submitVaccineOtp } from '../services/vaccineApi';
+import { fetchLongChauSummary, previewLongChauImport, commitLongChauImport, startLongChauAuth, getLongChauAuthStatus, syncLongChau, submitLongChauOtp } from '../services/longChauApi';
 import { getSyncTime, recordSyncTime, formatSyncTime } from '../services/syncTimeService';
 import { useNotification } from '../context/NotificationContext';
 
@@ -37,7 +37,9 @@ import {
 
   ImportPreviewResponse,
 
-  syncFptShop 
+  syncFptShop,
+
+  submitFptShopOtp
 
 } from '../services/fptShopApi';
 
@@ -177,7 +179,52 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
   const [isFptPolling, setIsFptPolling] = useState(false);
   const authState = chain === 'Vaccine' ? vaccineAuth : (chain === 'Long Châu' ? longChauAuth : fptAuth);
 
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [isSubmittingOtp, setIsSubmittingOtp] = useState(false);
+  const [otpError, setOtpError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (authState?.status === 'OTP_REQUIRED') {
+      setShowOtpModal(true);
+    }
+  }, [authState?.status]);
+
+  const handleConfirmOtp = async () => {
+    if (!otpCode || otpCode.length < 6) return;
+    setIsSubmittingOtp(true);
+    setOtpError(null);
+    try {
+      let res: AuthStatusResponse;
+      if (chain === 'Vaccine') {
+        res = await submitVaccineOtp(otpCode);
+        setVaccineAuth(res);
+      } else if (chain === 'Long Châu') {
+        res = await submitLongChauOtp(otpCode);
+        setLongChauAuth(res);
+      } else {
+        res = await submitFptShopOtp(otpCode);
+        setFptAuth(res);
+      }
+      if (res.authenticated) {
+        setShowOtpModal(false);
+        setOtpCode('');
+        setSyncToast({
+          show: true,
+          title: `Đăng nhập ${chain || 'FPT Shop'} thành công`,
+          subtitle: 'Phiên làm việc đã sẵn sàng để đồng bộ.'
+        });
+      } else if (res.status === 'LOGIN_FAILED') {
+        setOtpError('Tài khoản, mật khẩu hoặc mã OTP không chính xác.');
+      } else {
+        setOtpError('Chưa xác thực được. Vui lòng kiểm tra lại mã OTP.');
+      }
+    } catch (err: any) {
+      setOtpError(err.message || 'Lỗi khi gửi mã OTP');
+    } finally {
+      setIsSubmittingOtp(false);
+    }
+  };
 
   const handleStartAuth = useCallback(async () => {
     try {
@@ -193,16 +240,19 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
         const s = { authenticated: false, status: 'STARTING' }; setVaccineAuth(s); cachedVacAuth = s;
         const res = await startVaccineAuth(freshCreds);
         setVaccineAuth(res); cachedVacAuth = res;
+        if (res.status === 'OTP_REQUIRED' || res.status === 'LOGIN_PAGE') setShowOtpModal(true);
         if (!res.authenticated) setIsVacPolling(true);
       } else if (chain?.includes('Long')) {
         const s = { authenticated: false, status: 'STARTING' }; setLongChauAuth(s); cachedLcAuth = s;
         const res = await startLongChauAuth(freshCreds);
         setLongChauAuth(res); cachedLcAuth = res;
+        if (res.status === 'OTP_REQUIRED' || res.status === 'LOGIN_PAGE') setShowOtpModal(true);
         if (!res.authenticated) setIsLcPolling(true);
       } else {
         const s2 = { authenticated: false, status: 'STARTING' }; setFptAuth(s2); cachedFptAuth = s2;
         const res = await startFptShopAuth(freshCreds);
         setFptAuth(res); cachedFptAuth = res;
+        if (res.status === 'OTP_REQUIRED' || res.status === 'LOGIN_PAGE') setShowOtpModal(true);
         if (!res.authenticated) setIsFptPolling(true);
       }
     } catch (e) {
@@ -574,6 +624,61 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
     );
   };
 
+  const renderOtpModal = () => {
+    if (!showOtpModal) return null;
+    return createPortal(
+      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-6 w-[380px] max-w-[92vw] text-center space-y-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto shadow-inner">
+            <KeyRound size={24} />
+          </div>
+          <div>
+            <h3 className="font-bold text-slate-800 text-lg">Xác thực mã OTP {chain || 'Inside'}</h3>
+            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+              Nhập mã OTP 6 số từ ứng dụng <strong>Authy</strong> để đăng nhập trên máy chủ.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <input
+              type="text"
+              maxLength={6}
+              autoFocus
+              value={otpCode}
+              onChange={e => {
+                setOtpCode(e.target.value.replace(/\D/g, ''));
+                setOtpError(null);
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && otpCode.length === 6 && !isSubmittingOtp) handleConfirmOtp();
+              }}
+              className="w-full text-center text-3xl font-extrabold tracking-[0.35em] py-3.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-indigo-600 focus:bg-white focus:ring-4 focus:ring-indigo-100 outline-none transition-all tabular-nums text-slate-800 placeholder:text-slate-300"
+              placeholder="000000"
+            />
+            {otpError && <p className="text-xs text-rose-500 font-medium">{otpError}</p>}
+          </div>
+          <div className="flex gap-2.5 pt-1">
+            <button 
+              type="button" 
+              onClick={() => { setShowOtpModal(false); setOtpError(null); }}
+              className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 cursor-pointer transition-colors"
+            >
+              Hủy
+            </button>
+            <button 
+              type="button" 
+              onClick={handleConfirmOtp}
+              disabled={otpCode.length < 6 || isSubmittingOtp}
+              className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-indigo-600/20 transition-all"
+            >
+              {isSubmittingOtp ? <RefreshCw size={16} className="animate-spin" /> : 'Xác nhận OTP'}
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
 
   let kpiData = { total: 0, checked: 0, rate: '0%', employees: 0, totalEmployees: 0, reminders: 0, nonPenalty: 0, penalty: 0 };
   let chainData: any[] = [];
@@ -693,6 +798,7 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
       />
 
       {renderImportModal()}
+      {renderOtpModal()}
 
       {/* Last updated portaled to Sidebar Footer */}
       {mounted && document.getElementById('sidebar-footer-time') && createPortal(
@@ -816,11 +922,12 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
                      </button>
                   ) : authState?.status === 'OTP_REQUIRED' ? (
                      <button 
-                       onClick={handleStartAuth} 
-                       className="h-8.5 rounded-xl flex items-center justify-center bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 transition-all animate-bounce shadow-2xs" 
-                       title="Cần nhập OTP trên trình duyệt Chrome"
+                       onClick={() => setShowOtpModal(true)} 
+                       className="h-8.5 px-3 rounded-xl flex items-center justify-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 transition-all shadow-2xs cursor-pointer" 
+                       title="Cần nhập mã OTP (Click để mở form nhập)"
                      >
-                       <AlertCircle size={16} className="text-indigo-600" />
+                       <KeyRound size={15} className="text-indigo-600 animate-pulse" />
+                       <span className="text-[12px] font-bold text-indigo-700">Nhập OTP</span>
                      </button>
                   ) : authState?.status === 'ERROR' ? (
                      <button 

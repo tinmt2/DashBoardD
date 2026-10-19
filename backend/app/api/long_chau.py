@@ -59,6 +59,10 @@ from pydantic import BaseModel
 class AuthStartReq(BaseModel):
     username: str = ""
     password: str = ""
+    otp: str = ""
+
+class OtpRequest(BaseModel):
+    otp: str
 
 class SyncRequest(BaseModel):
     start_date: str
@@ -70,6 +74,12 @@ def long_chau_auth_start(req: Optional[AuthStartReq] = None):
     if req:
         session.temp_creds = req.dict()
     status = session.start()
+    return {"authenticated": status == "AUTHENTICATED", "status": status}
+
+@router.post("/auth/otp")
+def long_chau_auth_otp(req: OtpRequest):
+    session = LongChauBrowserSession.get_instance()
+    status = session.submit_otp(req.otp)
     return {"authenticated": status == "AUTHENTICATED", "status": status}
 
 @router.get("/auth/status")

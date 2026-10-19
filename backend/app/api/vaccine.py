@@ -49,6 +49,10 @@ from typing import Optional
 class AuthStartReq(BaseModel):
     username: str = ""
     password: str = ""
+    otp: str = ""
+
+class OtpRequest(BaseModel):
+    otp: str
 
 @router.post("/auth/start")
 def vaccine_auth_start(req: Optional[AuthStartReq] = None):
@@ -56,6 +60,12 @@ def vaccine_auth_start(req: Optional[AuthStartReq] = None):
     if req:
         session.temp_creds = req.dict()
     status = session.start()
+    return {"authenticated": status == "AUTHENTICATED", "status": status}
+
+@router.post("/auth/otp")
+def vaccine_auth_otp(req: OtpRequest):
+    session = VaccineBrowserSession.get_instance()
+    status = session.submit_otp(req.otp)
     return {"authenticated": status == "AUTHENTICATED", "status": status}
 
 @router.get("/auth/status")

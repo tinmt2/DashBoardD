@@ -79,12 +79,16 @@ class AuthStatusResponse(BaseModel):
 class AuthStartRequest(BaseModel):
     username: str = ""
     password: str = ""
+    otp: str = ""
+
+class OtpRequest(BaseModel):
+    otp: str
 
 @router.post("/auth/start", response_model=AuthStatusResponse)
 def auth_start(req: AuthStartRequest = None):
     session = FPTBrowserSession.get_instance()
     session._initial_probed = False
-    creds = {"username": req.username, "password": req.password} if req else None
+    creds = {"username": req.username, "password": req.password, "otp": req.otp} if req else None
     import logging
     logging.getLogger(__name__).info(f"AUTH START USERNAME: {creds.get('username') if creds else None}")
     if creds and creds.get("username"):
@@ -103,6 +107,15 @@ def auth_start(req: AuthStartRequest = None):
             if status in ("AUTHENTICATED", "LOGIN_FAILED", "OTP_REQUIRED"):
                 break
 
+    return AuthStatusResponse(
+        authenticated=(status == "AUTHENTICATED"),
+        status=status
+    )
+
+@router.post("/auth/otp", response_model=AuthStatusResponse)
+def auth_otp(req: OtpRequest):
+    session = FPTBrowserSession.get_instance()
+    status = session.submit_otp(req.otp)
     return AuthStatusResponse(
         authenticated=(status == "AUTHENTICATED"),
         status=status

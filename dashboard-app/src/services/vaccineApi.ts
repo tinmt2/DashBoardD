@@ -112,6 +112,19 @@ export const getVaccineAuthStatus = async (signal?: AbortSignal): Promise<AuthSt
     return response.json();
 };
 
+export const submitVaccineOtp = async (otp: string, signal?: AbortSignal): Promise<AuthStatusResponse> => {
+    const response = await fetch(`${API_BASE_URL}/api/vaccine/auth/otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ otp }),
+        signal
+    });
+    if (!response.ok) {
+        throw new Error('Failed to submit OTP');
+    }
+    return response.json();
+};
+
 export interface SyncRequest {
     start_date: string;
     end_date: string;

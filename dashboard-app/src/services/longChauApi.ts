@@ -112,6 +112,19 @@ export const getLongChauAuthStatus = async (signal?: AbortSignal): Promise<AuthS
     return response.json();
 };
 
+export const submitLongChauOtp = async (otp: string, signal?: AbortSignal): Promise<AuthStatusResponse> => {
+    const response = await fetch(`${API_BASE_URL}/api/long-chau/auth/otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ otp }),
+        signal
+    });
+    if (!response.ok) {
+        throw new Error('Failed to submit OTP');
+    }
+    return response.json();
+};
+
 export interface SyncRequest {
     start_date: string;
     end_date: string;

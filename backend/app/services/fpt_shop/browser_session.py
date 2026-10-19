@@ -111,9 +111,11 @@ class FPTBrowserSession(BaseBrowserSession):
                         js = """
                         let pwd = document.querySelector('input[name="LoginInput.Password"]') || document.querySelector('input[formcontrolname="password"]') || document.querySelector('input[type="password"]');
                         let acc = document.querySelector('input[name="LoginInput.UserNameOrEmailAddress"]') || document.querySelector('input[formcontrolname="employee_code"]') || document.querySelector('input[name="UserName"]') || document.querySelector('input[type="text"]');
+                        let otpInput = document.querySelector('input[name="LoginInput.Otp"]') || document.querySelector('input.input-otp') || document.querySelector('input[formcontrolname="otp"]');
                         
                         let providedUser = arguments[0];
                         let providedPass = arguments[1];
+                        let providedOtp = arguments[2];
                         
                         if (providedUser && providedPass && pwd && acc) {
                             const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
@@ -126,6 +128,12 @@ class FPTBrowserSession(BaseBrowserSession):
                             pwd.dispatchEvent(new Event('input', { bubbles: true }));
                             pwd.dispatchEvent(new Event('change', { bubbles: true }));
                             
+                            if (providedOtp && otpInput) {
+                                nativeInputValueSetter.call(otpInput, providedOtp);
+                                otpInput.dispatchEvent(new Event('input', { bubbles: true }));
+                                otpInput.dispatchEvent(new Event('change', { bubbles: true }));
+                            }
+                            
                             let btn = document.querySelector('#kt_login_signin_submit') || document.querySelector('button[type="submit"]') || document.querySelector('.kt-login__btn-primary');
                             if (btn && !window._fpt_submitted) {
                                 window._fpt_submitted = true;
@@ -135,8 +143,9 @@ class FPTBrowserSession(BaseBrowserSession):
                         """
                         user = self.temp_creds.get("username") if getattr(self, "temp_creds", None) else ""
                         pwd = self.temp_creds.get("password") if getattr(self, "temp_creds", None) else ""
+                        otp = self.temp_creds.get("otp") if getattr(self, "temp_creds", None) else ""
                         if user and pwd:
-                            self.driver.execute_script(js, user, pwd)
+                            self.driver.execute_script(js, user, pwd, otp)
                     except Exception as e:
                         pass
 
@@ -205,3 +214,39 @@ class FPTBrowserSession(BaseBrowserSession):
                 self.clear_driver()
                 
             return self.status
+
+    def submit_otp(self, otp: str) -> str:
+        with self._lock:
+            if not self.driver:
+                return "STOPPED"
+            try:
+                js = """
+                let otpInput = document.querySelector('input[name="LoginInput.Otp"]') || document.querySelector('input.input-otp') || document.querySelector('input[formcontrolname="otp"]') || document.querySelector('input[placeholder*="OTP"]');
+                let code = arguments[0];
+                if (otpInput && code) {
+                    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                    nativeInputValueSetter.call(otpInput, code);
+                    otpInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    otpInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    
+                    let btn = document.querySelector('#kt_login_signin_submit') || document.querySelector('button[type="submit"]') || document.querySelector('.kt-login__btn-primary');
+                    if (btn) {
+                        btn.click();
+                        return true;
+                    }
+                }
+                return false;
+                """
+                self.driver.execute_script(js, otp)
+                
+                import time
+                for _ in range(8):
+                    time.sleep(0.5)
+                    st = self.get_status()
+                    if st in ("AUTHENTICATED", "LOGIN_FAILED"):
+                        return st
+                return self.get_status()
+            except Exception as e:
+                logger.error(f"Error submitting OTP for {self.profile_name}: {e}")
+                return self.get_status()
+

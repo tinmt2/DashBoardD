@@ -242,3 +242,39 @@ class LongChauBrowserSession(BaseBrowserSession):
 
     def get_app_id(self):
         return "frt-gscmr-long-chau"
+
+    def submit_otp(self, otp: str) -> str:
+        with self._lock:
+            if not self.driver:
+                return "STOPPED"
+            try:
+                js = """
+                let otpInput = document.querySelector('input[name="LoginInput.Otp"]') || document.querySelector('input.input-otp') || document.querySelector('input[formcontrolname="otp"]') || document.querySelector('input[placeholder*="OTP"]');
+                let code = arguments[0];
+                if (otpInput && code) {
+                    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                    nativeInputValueSetter.call(otpInput, code);
+                    otpInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    otpInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    
+                    let btn = document.querySelector('#kt_login_signin_submit') || document.querySelector('button[type="submit"]') || document.querySelector('.kt-login__btn-primary');
+                    if (btn) {
+                        btn.click();
+                        return true;
+                    }
+                }
+                return false;
+                """
+                self.driver.execute_script(js, otp)
+                
+                import time
+                for _ in range(8):
+                    time.sleep(0.5)
+                    st = self.get_status()
+                    if st in ("AUTHENTICATED", "LOGIN_FAILED"):
+                        return st
+                return self.get_status()
+            except Exception as e:
+                logger.error(f"Error submitting OTP for {self.profile_name}: {e}")
+                return self.get_status()
+

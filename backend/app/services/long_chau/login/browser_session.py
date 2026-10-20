@@ -218,8 +218,11 @@ class LongChauBrowserSession(BaseBrowserSession):
                 else:
                     self.status = "UNKNOWN"
             except Exception as e:
-                if self.status != "AUTHENTICATED":
-                    logger.error(f"Long Chau browser session lost: {e}")
+                err_str = str(e).lower()
+                if "invalid session id" in err_str or "not connected to devtools" in err_str:
+                    logger.debug(f"Long Chau browser closed: {e}")
+                elif self.status != "AUTHENTICATED":
+                    logger.warning(f"Long Chau browser session lost: {e}")
                     self.status = "STOPPED"
                 self.clear_driver()
                 

@@ -188,9 +188,18 @@ def sync_fpt_shop(req: SyncRequest, db: Session = Depends(get_db)):
     
     try:
         driver = session.driver
-        body = f"Type=Gi%C3%A1m+s%C3%A1t+h%C3%ACnh+%E1%BA%A3nh+Camera&stepNo=-1&requestId=&Type=&Region=&sender=&timeStart={req.start_date.strftime('%d/%m/%Y')}&timeEnd={req.end_date.strftime('%d/%m/%Y')}&month_giuluong_37=&year_giuluong_37=&RegionId=&OfficeId=&TypeId=150"
-        
         logger.info(f"[FPT_SYNC] current_url={driver.current_url}")
+        try:
+            dom_dates = driver.execute_script("""
+                return {
+                    start: document.querySelector('#timeStart')?.value || document.querySelector('[name=timeStart]')?.value || '',
+                    end: document.querySelector('#timeEnd')?.value || document.querySelector('[name=timeEnd]')?.value || ''
+                };
+            """)
+            logger.info(f"[FPT_SYNC] DOM default date inputs: {dom_dates}")
+        except Exception as e:
+            logger.warning(f"[FPT_SYNC] Could not read DOM dates: {e}")
+
         driver.set_script_timeout(60)
         js_code = """
         var callback = arguments[arguments.length - 1];
@@ -238,7 +247,23 @@ def sync_fpt_shop(req: SyncRequest, db: Session = Depends(get_db)):
         })
         .catch(e => callback({status: 500, error: e.toString()}));
         """
-        result = driver.execute_async_script(js_code, body)
+
+        date_formats_to_try = ["%m/%d/%Y", "%Y-%m-%d", "%d/%m/%Y"]
+        result = None
+        for fmt in date_formats_to_try:
+            start_str = req.start_date.strftime(fmt)
+            end_str = req.end_date.strftime(fmt)
+            body = f"Type=Gi%C3%A1m+s%C3%A1t+h%C3%ACnh+%E1%BA%A3nh+Camera&stepNo=-1&requestId=&Type=&Region=&sender=&timeStart={start_str}&timeEnd={end_str}&month_giuluong_37=&year_giuluong_37=&RegionId=&OfficeId=&TypeId=150"
+            logger.info(f"[FPT_SYNC] Trying date format '{fmt}': timeStart={start_str}, timeEnd={end_str}")
+            result = driver.execute_async_script(js_code, body)
+            if result.get("status") == 200:
+                logger.info(f"[FPT_SYNC] Date format '{fmt}' SUCCEEDED!")
+                break
+            else:
+                err_text = str(result.get("error", ""))
+                logger.warning(f"[FPT_SYNC] Date format '{fmt}' failed (status {result.get('status')}): {err_text[:150]}")
+                if "DateTime" not in err_text and result.get("status") in (401, 403):
+                    break
         
         if result.get("status") != 200:
             status_code = result.get("status")
@@ -247,7 +272,7 @@ def sync_fpt_shop(req: SyncRequest, db: Session = Depends(get_db)):
                 session.status = "LOGIN_PAGE"
                 error_msg = f"Phiên làm việc FPT Shop chưa được xác thực hoặc đã hết hạn (Mã {status_code}). Vui lòng bấm 'Đăng nhập FPT' để đăng nhập lại."
             else:
-                error_msg = f"Failed to download Excel. Status: {status_code}"
+                error_msg = f"Failed to download Excel. Status: {status_code} - {error_detail}"
             logger.error(f"[FPT_SYNC] {error_msg} - Detail: {error_detail}")
             return SyncResponse(
                 success=False,

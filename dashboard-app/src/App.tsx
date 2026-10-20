@@ -11,6 +11,7 @@ import KPIConcepts from './pages/KPIConcepts';
 import type { Chain } from './types';
 
 import OverviewDashboard from './pages/OverviewDashboard';
+import Admin from './pages/Admin';
 import { NotificationProvider } from './context/NotificationContext';
 import { SyncProvider } from './context/SyncContext';
 
@@ -44,6 +45,7 @@ function App() {
       <NotificationProvider>
         <SyncProvider>
           <Routes>
+            <Route path="/admin" element={<Admin />} />
             <Route path="/" element={<Layout />}>
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<OverviewDashboard />} />

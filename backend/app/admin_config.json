@@ -1,0 +1,22 @@
+{
+  "admin_username": "admin",
+  "admin_password_hash": "7676aaafb027c825bd9abab78b234070e702752f625b752e55e55b48e607e358",
+  "active_tokens": [
+    {
+      "token": "5a63e2e8ebd4d8401c3f334b2eeee66a",
+      "created_at": 1792429044.1438875
+    },
+    {
+      "token": "481037d5461f6faefbae85f259df4c7e",
+      "created_at": 1792429049.3828003
+    },
+    {
+      "token": "5869eb1b41e918e44b92db619854b415",
+      "created_at": 1792429128.1019504
+    },
+    {
+      "token": "92aadf90f8ba2b2e1fb9fbba5e787449",
+      "created_at": 1792466922.790483
+    }
+  ]
+}

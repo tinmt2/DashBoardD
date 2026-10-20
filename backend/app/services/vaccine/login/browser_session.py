@@ -205,8 +205,11 @@ class VaccineBrowserSession(BaseBrowserSession):
                 else:
                     self.status = "UNKNOWN"
             except Exception as e:
-                if self.status != "AUTHENTICATED":
-                    logger.error(f"Vaccine browser session lost: {e}")
+                err_str = str(e).lower()
+                if "invalid session id" in err_str or "not connected to devtools" in err_str:
+                    logger.debug(f"Vaccine browser closed: {e}")
+                elif self.status != "AUTHENTICATED":
+                    logger.warning(f"Vaccine browser session lost: {e}")
                     self.status = "STOPPED"
                 self.clear_driver()
                 

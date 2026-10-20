@@ -16,6 +16,7 @@ import app.models.ticket
 import app.models.import_job
 import app.models.long_chau
 import app.models.notification
+import app.models.employee
 
 Base.metadata.create_all(bind=engine)
 
@@ -31,9 +32,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from app.api import health, fpt_shop, long_chau, long_chau_dashboard, vaccine, vaccine_dashboard, notifications
+from app.api import health, fpt_shop, long_chau, long_chau_dashboard, vaccine, vaccine_dashboard, notifications, admin, employees
 
 app.include_router(health.router, prefix="/api")
+app.include_router(admin.router, prefix="/api/admin")
+app.include_router(employees.router, prefix="/api/employees")
 app.include_router(fpt_shop.router, prefix="/api/fpt-shop")
 app.include_router(long_chau.router, prefix="/api/long-chau")
 app.include_router(long_chau_dashboard.router, prefix="/api")

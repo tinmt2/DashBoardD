@@ -200,3 +200,58 @@ def admin_overview(db: Session = Depends(get_db)):
         "recent_jobs": recent_jobs,
         "checked_at": datetime.now(timezone.utc).isoformat()
     }
+
+# ==========================================
+# 6. LOGS & LIVE SYNC DIAGNOSTICS FOR ADMIN
+# ==========================================
+from fastapi import Query
+from app.core.logging import get_recent_logs, clear_memory_logs
+
+@router.get("/logs")
+def get_admin_logs(
+    lines: int = Query(200, ge=1, le=2000),
+    level: Optional[str] = Query("ALL"),
+    search: Optional[str] = Query(None)
+):
+    logs = get_recent_logs(lines=lines, level=level, search=search)
+    return {
+        "success": True,
+        "total": len(logs),
+        "logs": logs
+    }
+
+@router.delete("/logs")
+def clear_admin_logs():
+    clear_memory_logs()
+    return {"success": True, "message": "Đã làm trống toàn bộ log trong bộ nhớ!"}
+
+@router.post("/test-sync/fpt")
+def test_sync_fpt_admin(db: Session = Depends(get_db)):
+    from app.api.fpt_shop import sync_fpt_shop, SyncRequest
+    from datetime import date
+    import logging
+    logger = logging.getLogger("app.api.admin")
+    logger.info("[ADMIN_DIAGNOSTIC] === BẮT ĐẦU CHẠY THỬ ĐỒNG BỘ FPT SHOP TỪ TRANG ADMIN ===")
+    
+    today = date.today()
+    start_date = today.replace(day=1)
+    req = SyncRequest(start_date=start_date, end_date=today)
+    
+    try:
+        res = sync_fpt_shop(req, db)
+        if res.success:
+            logger.info(f"[ADMIN_DIAGNOSTIC] Đồng bộ FPT Shop THÀNH CÔNG! Đã tải {res.total_rows} dòng, {res.new_records} lỗi mới.")
+        else:
+            logger.error(f"[ADMIN_DIAGNOSTIC] Đồng bộ FPT Shop THẤT BẠI: {res.error_message}")
+        return {
+            "success": res.success,
+            "data": res.model_dump(),
+            "message": "Đồng bộ FPT Shop thành công!" if res.success else f"Thất bại: {res.error_message}"
+        }
+    except Exception as e:
+        logger.error(f"[ADMIN_DIAGNOSTIC] Ngoại lệ khi chạy thử đồng bộ FPT: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": f"Lỗi ngoại lệ: {e}"
+        }

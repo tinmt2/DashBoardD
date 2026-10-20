@@ -167,14 +167,18 @@ def sync_fpt_shop(req: SyncRequest, db: Session = Depends(get_db)):
     status = session.get_status()
     if status != "AUTHENTICATED" or session.driver is None:
         if session.driver is None:
+            logger.info("[FPT_SYNC] Đang khởi động trình duyệt headless...")
             status = session.start(headless=True)
-            if status != "AUTHENTICATED":
+            for wait_idx in range(10):
+                if status == "AUTHENTICATED":
+                    break
                 import time
-                time.sleep(1.5)
+                time.sleep(1.0)
                 status = session.get_status()
+                logger.info(f"[FPT_SYNC] Đang đợi xác thực ({wait_idx + 1}/10s) - Trạng thái: {status}")
         
     if status != "AUTHENTICATED" or session.driver is None:
-        logger.error(f"[FPT_SYNC] Failed - FPT Shop browser session is not authenticated. Status: {status}")
+        logger.error(f"[FPT_SYNC] Thất bại - Phiên làm việc FPT chưa được xác thực. Trạng thái: {status}")
         return SyncResponse(
             success=False,
             start_date=req.start_date,
@@ -182,35 +186,32 @@ def sync_fpt_shop(req: SyncRequest, db: Session = Depends(get_db)):
             error_message="Phiên đăng nhập FPT Shop chưa được xác thực hoặc đã hết hạn. Vui lòng bấm Đăng nhập FPT."
         )
 
-    logger.info(f"[FPT_SYNC] start={req.start_date.strftime('%Y-%m-%d')} end={req.end_date.strftime('%Y-%m-%d')}")
-    logger.info("[FPT_SYNC] authenticated=true")
-    logger.info("[FPT_SYNC] requesting GetDebtReportExcel")
+    logger.info(f"[FPT_SYNC] Bắt đầu đồng bộ từ {req.start_date.strftime('%Y-%m-%d')} đến {req.end_date.strftime('%Y-%m-%d')}")
+    logger.info("[FPT_SYNC] Trình duyệt đã sẵn sàng, chuẩn bị tải báo cáo Excel...")
     
     try:
         driver = session.driver
-        logger.info(f"[FPT_SYNC] current_url={driver.current_url}")
-        try:
-            dom_dates = driver.execute_script("""
-                return {
-                    start: document.querySelector('#timeStart')?.value || document.querySelector('[name=timeStart]')?.value || '',
-                    end: document.querySelector('#timeEnd')?.value || document.querySelector('[name=timeEnd]')?.value || ''
-                };
-            """)
-            logger.info(f"[FPT_SYNC] DOM default date inputs: {dom_dates}")
-        except Exception as e:
-            logger.warning(f"[FPT_SYNC] Could not read DOM dates: {e}")
+        curr_url = driver.current_url.lower() if driver else ""
+        logger.info(f"[FPT_SYNC] URL hiện tại của trình duyệt: {driver.current_url}")
+        
+        # Nếu chưa ở trang DebtConfirm, chủ động điều hướng tới đó
+        if "calllog.fptshop.com.vn/report/debtconfirm" not in curr_url:
+            logger.info("[FPT_SYNC] Đang chuyển hướng trình duyệt tới trang DebtConfirm...")
+            driver.get("https://calllog.fptshop.com.vn/Report/DebtConfirm")
+            import time
+            time.sleep(2.0)
+            logger.info(f"[FPT_SYNC] Sau khi chuyển hướng: {driver.current_url}")
 
-        driver.set_script_timeout(60)
+        driver.set_script_timeout(50)
         js_code = """
         var callback = arguments[arguments.length - 1];
         var bodyData = arguments[0];
         var token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
         var headers = {
-            "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+            "accept": "*/*",
             "accept-language": "vi,en-US;q=0.9,en;q=0.8",
-            "cache-control": "max-age=0",
+            "cache-control": "no-cache",
             "content-type": "application/x-www-form-urlencoded",
-            "upgrade-insecure-requests": "1",
             "X-Requested-With": "XMLHttpRequest"
         };
         if (token) {
@@ -220,32 +221,46 @@ def sync_fpt_shop(req: SyncRequest, db: Session = Depends(get_db)):
         if (token && fullBody.indexOf('__RequestVerificationToken') === -1) {
             fullBody += '&__RequestVerificationToken=' + encodeURIComponent(token);
         }
+
+        var controller = new AbortController();
+        var timer = setTimeout(function() {
+            controller.abort();
+            callback({status: 408, error: "Hết thời gian chờ phản hồi từ máy chủ FPT Shop (Timeout 35s)"});
+        }, 35000);
+
         fetch("https://calllog.fptshop.com.vn/Report/GetDebtReportExcel", {
           "headers": headers,
           "body": fullBody,
           "method": "POST",
-          "credentials": "include"
+          "credentials": "include",
+          "signal": controller.signal
         })
-        .then(r => {
+        .then(function(r) {
+            clearTimeout(timer);
             if (!r.ok) {
-                return r.text().then(t => {
+                return r.text().then(function(t) {
                     callback({status: r.status, error: t});
-                }).catch(() => {
+                }).catch(function() {
                     callback({status: r.status, error: "HTTP Error " + r.status});
                 });
             }
-            var ct = r.headers.get("content-type");
-            if (ct && ct.indexOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") === -1 && ct.indexOf("excel") === -1) {
-                callback({status: 400, error: "Invalid Content-Type: " + ct});
-                return null;
+            var ct = (r.headers.get("content-type") || "").toLowerCase();
+            if (ct.indexOf("sheet") === -1 && ct.indexOf("excel") === -1 && ct.indexOf("octet-stream") === -1) {
+                return r.text().then(function(t) {
+                    callback({status: 400, error: "Phản hồi không phải file Excel (" + ct + "): " + t.substring(0, 200)});
+                });
             }
-            return r.blob().then(b => {
+            return r.blob().then(function(b) {
                 var reader = new FileReader();
-                reader.onload = function() { callback({status: 200, data: reader.result}); }
+                reader.onload = function() { callback({status: 200, data: reader.result}); };
+                reader.onerror = function(err) { callback({status: 500, error: "Lỗi đọc file Excel: " + err}); };
                 reader.readAsDataURL(b);
             });
         })
-        .catch(e => callback({status: 500, error: e.toString()}));
+        .catch(function(e) {
+            clearTimeout(timer);
+            callback({status: 500, error: e.toString()});
+        });
         """
 
         date_formats_to_try = ["%m/%d/%Y", "%Y-%m-%d", "%d/%m/%Y"]
@@ -254,26 +269,31 @@ def sync_fpt_shop(req: SyncRequest, db: Session = Depends(get_db)):
             start_str = req.start_date.strftime(fmt)
             end_str = req.end_date.strftime(fmt)
             body = f"Type=Gi%C3%A1m+s%C3%A1t+h%C3%ACnh+%E1%BA%A3nh+Camera&stepNo=-1&requestId=&Type=&Region=&sender=&timeStart={start_str}&timeEnd={end_str}&month_giuluong_37=&year_giuluong_37=&RegionId=&OfficeId=&TypeId=150"
-            logger.info(f"[FPT_SYNC] Trying date format '{fmt}': timeStart={start_str}, timeEnd={end_str}")
-            result = driver.execute_async_script(js_code, body)
-            if result.get("status") == 200:
-                logger.info(f"[FPT_SYNC] Date format '{fmt}' SUCCEEDED!")
+            logger.info(f"[FPT_SYNC] Đang thử gửi định dạng ngày '{fmt}': timeStart={start_str}, timeEnd={end_str}")
+            try:
+                result = driver.execute_async_script(js_code, body)
+            except Exception as script_err:
+                logger.error(f"[FPT_SYNC] Lỗi thực thi script trình duyệt: {script_err}")
+                result = {"status": 500, "error": str(script_err)}
+                
+            if result and result.get("status") == 200:
+                logger.info(f"[FPT_SYNC] Định dạng ngày '{fmt}' TẢI FILE THÀNH CÔNG!")
                 break
             else:
-                err_text = str(result.get("error", ""))
-                logger.warning(f"[FPT_SYNC] Date format '{fmt}' failed (status {result.get('status')}): {err_text[:150]}")
-                if "DateTime" not in err_text and result.get("status") in (401, 403):
+                err_text = str(result.get("error", "")) if result else "Không có phản hồi"
+                logger.warning(f"[FPT_SYNC] Định dạng ngày '{fmt}' thất bại (Mã {result.get('status') if result else 'N/A'}): {err_text[:150]}")
+                if "DateTime" not in err_text and result and result.get("status") in (401, 403):
                     break
         
-        if result.get("status") != 200:
-            status_code = result.get("status")
-            error_detail = str(result.get("error", ""))[:200]
+        if not result or result.get("status") != 200:
+            status_code = result.get("status") if result else 500
+            error_detail = str(result.get("error", ""))[:250] if result else "Không có dữ liệu"
             if status_code in (401, 403):
                 session.status = "LOGIN_PAGE"
                 error_msg = f"Phiên làm việc FPT Shop chưa được xác thực hoặc đã hết hạn (Mã {status_code}). Vui lòng bấm 'Đăng nhập FPT' để đăng nhập lại."
             else:
-                error_msg = f"Failed to download Excel. Status: {status_code} - {error_detail}"
-            logger.error(f"[FPT_SYNC] {error_msg} - Detail: {error_detail}")
+                error_msg = f"Máy chủ FPT từ chối tải file Excel (Mã {status_code}): {error_detail}"
+            logger.error(f"[FPT_SYNC] {error_msg}")
             return SyncResponse(
                 success=False,
                 start_date=req.start_date,

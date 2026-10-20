@@ -4,7 +4,7 @@ import {
   Shield, Server, Cpu, Database, RefreshCw, Key, LogOut, 
   AlertTriangle, Clock, Activity, ArrowLeft, 
   Eye, EyeOff, Lock, User, HardDrive, Wifi, Store, Pill, 
-  ShieldPlus, Bell, CheckCircle2
+  ShieldPlus, Bell, CheckCircle2, Terminal, Play, Trash2, Download, Search, AlertCircle, XCircle
 } from 'lucide-react';
 import { GlassCard } from '../components/common/GlassCard';
 import BrandLogo from '../components/common/BrandLogo';
@@ -72,6 +72,18 @@ const Admin: React.FC = () => {
   const [pwError, setPwError] = useState('');
   const [pwSuccess, setPwSuccess] = useState('');
 
+  // Log Viewer State
+  const [logs, setLogs] = useState<Array<{ id: string; timestamp: string; level: string; logger: string; message: string }>>([]);
+  const [logLevelFilter, setLogLevelFilter] = useState<'ALL' | 'ERROR' | 'WARNING' | 'INFO'>('ALL');
+  const [logSearch, setLogSearch] = useState('');
+  const [logLinesLimit, setLogLinesLimit] = useState(200);
+  const [isAutoRefreshLogs, setIsAutoRefreshLogs] = useState(true);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+  const [autoScrollLogs, setAutoScrollLogs] = useState(true);
+  const [isTestingSync, setIsTestingSync] = useState(false);
+  const [testSyncResult, setTestSyncResult] = useState<{ success: boolean; message: string } | null>(null);
+  const logContainerRef = React.useRef<HTMLDivElement>(null);
+
   // 1. Verify token on load
   useEffect(() => {
     if (token) {
@@ -117,6 +129,95 @@ const Admin: React.FC = () => {
       if (interval) clearInterval(interval);
     };
   }, [token, autoRefresh]);
+
+  // Fetch logs
+  const fetchLogs = async () => {
+    try {
+      setIsLoadingLogs(true);
+      const params = new URLSearchParams({
+        lines: logLinesLimit.toString(),
+        level: logLevelFilter,
+      });
+      if (logSearch.trim()) {
+        params.append('search', logSearch.trim());
+      }
+      const res = await fetch(`/api/admin/logs?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        setLogs(data.logs || []);
+      }
+    } catch (err) {
+      console.error("Lỗi khi tải log:", err);
+    } finally {
+      setIsLoadingLogs(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!token) return;
+    fetchLogs();
+
+    let logInterval: ReturnType<typeof setInterval> | null = null;
+    if (isAutoRefreshLogs) {
+      logInterval = setInterval(fetchLogs, 2500);
+    }
+    return () => {
+      if (logInterval) clearInterval(logInterval);
+    };
+  }, [token, isAutoRefreshLogs, logLevelFilter, logLinesLimit, logSearch]);
+
+  // Auto-scroll log box
+  useEffect(() => {
+    if (autoScrollLogs && logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+    }
+  }, [logs, autoScrollLogs]);
+
+  // Clear logs
+  const handleClearLogs = async () => {
+    if (!confirm('Bạn có chắc muốn xóa sạch log trên màn hình không?')) return;
+    try {
+      await fetch('/api/admin/logs', { method: 'DELETE' });
+      setLogs([]);
+    } catch (err) {
+      console.error("Lỗi khi xóa log:", err);
+    }
+  };
+
+  // Trigger test sync for FPT Shop
+  const handleTestSyncFpt = async () => {
+    setIsTestingSync(true);
+    setTestSyncResult(null);
+    try {
+      const res = await fetch('/api/admin/test-sync/fpt', { method: 'POST' });
+      const data = await res.json();
+      setTestSyncResult({
+        success: data.success,
+        message: data.message || (data.success ? 'Đồng bộ FPT Shop thành công!' : 'Đồng bộ thất bại!')
+      });
+      await fetchLogs();
+      await fetchOverview();
+    } catch (err: any) {
+      setTestSyncResult({
+        success: false,
+        message: 'Lỗi khi gọi API chạy thử: ' + (err.message || String(err))
+      });
+    } finally {
+      setIsTestingSync(false);
+    }
+  };
+
+  // Download log file
+  const handleDownloadLogs = () => {
+    const textContent = logs.map(l => `[${l.timestamp}] [${l.level}] ${l.logger}: ${l.message}`).join('\n');
+    const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dashboardd-logs-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // Handle Login
   const handleLogin = async (e: React.FormEvent) => {
@@ -545,6 +646,242 @@ const Admin: React.FC = () => {
             </div>
 
           </div>
+        </div>
+
+        {/* === SECTION 2.5: LIVE LOG CONSOLE & SYNC DIAGNOSTICS === */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 backdrop-blur-xl shadow-2xl space-y-4">
+          
+          {/* Header & Controls */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl flex items-center justify-center">
+                <Terminal size={22} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-black text-white tracking-tight">Nhật Ký Hệ Thống & Đồng Bộ (Live Console)</h2>
+                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold flex items-center gap-1.5 ${
+                    isAutoRefreshLogs ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-400'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${isAutoRefreshLogs ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+                    {isAutoRefreshLogs ? 'Live 2.5s' : 'Đã dừng'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">Theo dõi trực tiếp từng bước kết nối Selenium, tải file Excel và gọi API FPT / Long Châu / Vaccine</p>
+              </div>
+            </div>
+
+            {/* Quick Actions & Trigger Test Sync */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={handleTestSyncFpt}
+                disabled={isTestingSync}
+                className="px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                title="Bấm để kích hoạt đồng bộ FPT ngay lập tức và xem log trực tiếp"
+              >
+                {isTestingSync ? <RefreshCw size={14} className="animate-spin" /> : <Play size={14} fill="currentColor" />}
+                {isTestingSync ? 'Đang chạy đồng bộ FPT...' : '⚡ Chạy Thử Đồng Bộ FPT Ngay'}
+              </button>
+
+              <button
+                onClick={fetchLogs}
+                disabled={isLoadingLogs}
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold border border-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+                title="Tải lại log"
+              >
+                <RefreshCw size={14} className={isLoadingLogs ? "animate-spin" : ""} />
+                Làm mới
+              </button>
+
+              <button
+                onClick={handleClearLogs}
+                className="px-3 py-2 bg-slate-800 hover:bg-rose-900/40 text-slate-300 hover:text-rose-300 rounded-xl text-xs font-semibold border border-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+                title="Xóa log hiện tại"
+              >
+                <Trash2 size={14} />
+                Xóa log
+              </button>
+
+              <button
+                onClick={handleDownloadLogs}
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold border border-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+                title="Tải file log về máy"
+              >
+                <Download size={14} />
+                Tải log (.txt)
+              </button>
+            </div>
+          </div>
+
+          {/* Test Sync Banner Result if triggered */}
+          {testSyncResult && (
+            <div className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-between gap-3 ${
+              testSyncResult.success 
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' 
+                : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+            }`}>
+              <div className="flex items-center gap-2">
+                {testSyncResult.success ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+                <span><strong>Kết quả chạy thử FPT:</strong> {testSyncResult.message}</span>
+              </div>
+              <button onClick={() => setTestSyncResult(null)} className="text-slate-400 hover:text-white">✕</button>
+            </div>
+          )}
+
+          {/* Filter Bar & Options */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            
+            {/* Level Filters */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-slate-400 font-bold mr-1">Bộ lọc:</span>
+              {(['ALL', 'ERROR', 'WARNING', 'INFO'] as const).map(lvl => (
+                <button
+                  key={lvl}
+                  onClick={() => setLogLevelFilter(lvl)}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                    logLevelFilter === lvl
+                      ? (lvl === 'ERROR' ? 'bg-rose-500 text-white shadow' :
+                         lvl === 'WARNING' ? 'bg-amber-500 text-slate-950 shadow' :
+                         lvl === 'INFO' ? 'bg-blue-600 text-white shadow' :
+                         'bg-slate-200 text-slate-900 shadow')
+                      : 'bg-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+                  }`}
+                >
+                  {lvl === 'ALL' ? 'Tất cả' : lvl}
+                </button>
+              ))}
+            </div>
+
+            {/* Search Box & Auto-scroll Toggle */}
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={logSearch}
+                  onChange={(e) => setLogSearch(e.target.value)}
+                  placeholder="Lọc từ khóa (fpt, error, sync...)"
+                  className="pl-8 pr-3 py-1 bg-slate-950 border border-slate-800 rounded-lg text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 w-48 sm:w-56"
+                />
+                {logSearch && (
+                  <button 
+                    onClick={() => setLogSearch('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white text-xs"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              <select
+                value={logLinesLimit}
+                onChange={(e) => setLogLinesLimit(Number(e.target.value))}
+                className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-slate-300 text-xs focus:outline-none focus:border-indigo-500"
+              >
+                <option value={100}>100 dòng</option>
+                <option value={200}>200 dòng</option>
+                <option value={500}>500 dòng</option>
+                <option value={1000}>1000 dòng</option>
+              </select>
+
+              <label className="flex items-center gap-1.5 text-slate-400 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={autoScrollLogs}
+                  onChange={(e) => setAutoScrollLogs(e.target.checked)}
+                  className="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-0"
+                />
+                <span>Cuộn tự động</span>
+              </label>
+
+              <label className="flex items-center gap-1.5 text-slate-400 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={isAutoRefreshLogs}
+                  onChange={(e) => setIsAutoRefreshLogs(e.target.checked)}
+                  className="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-0"
+                />
+                <span>Live</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Terminal Display */}
+          <div className="bg-slate-950/95 border border-slate-800/90 rounded-xl overflow-hidden shadow-inner">
+            
+            {/* Terminal Window Top Bar */}
+            <div className="px-3 py-2 bg-slate-900 border-b border-slate-800/80 flex items-center justify-between text-[11px] font-mono text-slate-400">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80 inline-block"></span>
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block"></span>
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block"></span>
+                <span className="ml-2 text-slate-400 font-bold">opsmonitor-daemon@server: ~/logs</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span>Hiển thị: <strong>{logs.length}</strong> dòng</span>
+              </div>
+            </div>
+
+            {/* Terminal Log Lines Body */}
+            <div 
+              ref={logContainerRef}
+              className="p-3.5 max-h-[380px] overflow-y-auto space-y-1 font-mono text-[11px] leading-relaxed selection:bg-indigo-500 selection:text-white"
+            >
+              {logs.length === 0 ? (
+                <div className="py-12 text-center text-slate-500 space-y-1">
+                  <Terminal size={24} className="mx-auto text-slate-600" />
+                  <p>Chưa có log nào được ghi nhận hoặc không khớp với bộ lọc.</p>
+                  <p className="text-[10px] text-slate-600">Bấm "⚡ Chạy Thử Đồng Bộ FPT Ngay" ở trên để kiểm tra kết nối.</p>
+                </div>
+              ) : (
+                logs.map((log, index) => {
+                  const isErr = log.level === 'ERROR' || log.message.toLowerCase().includes('fail') || log.message.toLowerCase().includes('lỗi');
+                  const isWarn = log.level === 'WARNING' || log.level === 'WARN';
+                  const isSuccess = log.message.toLowerCase().includes('thành công') || log.message.toLowerCase().includes('succeeded') || log.message.toLowerCase().includes('complete');
+                  
+                  return (
+                    <div 
+                      key={log.id || index}
+                      className={`flex items-start gap-2 py-0.5 px-1.5 rounded transition-colors hover:bg-slate-900/60 ${
+                        isErr ? 'bg-rose-950/20 text-rose-200' :
+                        isWarn ? 'bg-amber-950/20 text-amber-200' :
+                        isSuccess ? 'bg-emerald-950/20 text-emerald-200' :
+                        'text-slate-300'
+                      }`}
+                    >
+                      {/* Line Number */}
+                      <span className="text-slate-600 select-none w-7 text-right shrink-0">{index + 1}</span>
+                      
+                      {/* Timestamp */}
+                      <span className="text-slate-500 shrink-0 select-none">[{log.timestamp.slice(11)}]</span>
+                      
+                      {/* Level Badge */}
+                      <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold shrink-0 select-none uppercase ${
+                        log.level === 'ERROR' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
+                        log.level === 'WARNING' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                        log.level === 'DEBUG' ? 'bg-slate-800 text-slate-400' :
+                        'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                      }`}>
+                        {log.level}
+                      </span>
+
+                      {/* Logger Module */}
+                      <span className="text-indigo-400 shrink-0 hidden sm:inline select-none">
+                        [{log.logger.replace('app.services.', '').replace('app.api.', '')}]:
+                      </span>
+
+                      {/* Message */}
+                      <span className="break-all whitespace-pre-wrap flex-1">
+                        {log.message}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+          </div>
+
         </div>
 
         {/* === SECTION 3: SYSTEM AUDIT & RECENT NOTIFICATIONS === */}

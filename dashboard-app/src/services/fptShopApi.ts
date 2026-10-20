@@ -157,8 +157,15 @@ export const syncFptShop = async (data: SyncRequest, signal?: AbortSignal): Prom
         signal 
     });
     if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.detail || 'Failed to sync FPT Shop data');
+        let errorMsg = `Lỗi máy chủ (${response.status})`;
+        try {
+            const err = await response.json();
+            errorMsg = err.detail || err.error_message || errorMsg;
+        } catch {
+            const text = await response.text().catch(() => '');
+            if (text) errorMsg = text.substring(0, 150);
+        }
+        throw new Error(errorMsg);
     }
     const result: SyncResponse = await response.json();
     if (!result.success) {

@@ -26,3 +26,5 @@ dashboard-app/dist/
 .agents/
 skills-lock.json
 .DS_Store
+*.exe
+config.yml

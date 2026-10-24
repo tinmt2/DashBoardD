@@ -4,10 +4,18 @@ import {
   Shield, Server, Cpu, Database, RefreshCw, Key, LogOut, 
   AlertTriangle, Clock, Activity, ArrowLeft, 
   Eye, EyeOff, Lock, User, HardDrive, Wifi, Store, Pill, 
-  ShieldPlus, Bell, CheckCircle2, Terminal, Play, Trash2, Download, Search, AlertCircle, XCircle
+  ShieldPlus, Bell, CheckCircle2, Terminal, Play, Trash2, Download, Search, AlertCircle, XCircle,
+  Calendar, Layers, Save, Check, Loader2
 } from 'lucide-react';
+import { 
+  getAutoSyncConfig, 
+  updateAutoSyncConfig, 
+  triggerAutoSyncRunNow, 
+  AutoSyncConfig 
+} from '../services/autoSyncApi';
 import { GlassCard } from '../components/common/GlassCard';
 import BrandLogo from '../components/common/BrandLogo';
+import { parseUtcDate } from '../utils/dateUtils';
 
 interface SystemOverview {
   system: {
@@ -83,6 +91,23 @@ const Admin: React.FC = () => {
   const [isTestingSync, setIsTestingSync] = useState(false);
   const [testSyncResult, setTestSyncResult] = useState<{ success: boolean; message: string } | null>(null);
   const logContainerRef = React.useRef<HTMLDivElement>(null);
+
+  // Auto-Sync Scheduler State
+  const [autoSyncConfig, setAutoSyncConfig] = useState<AutoSyncConfig | null>(null);
+  const [autoSyncForm, setAutoSyncForm] = useState<{
+    enabled: boolean;
+    interval_minutes: number;
+    sync_chains: string[];
+    date_range_days: number;
+  }>({
+    enabled: false,
+    interval_minutes: 60,
+    sync_chains: ['fpt_shop', 'long_chau', 'vaccine'],
+    date_range_days: 30,
+  });
+  const [isSavingAutoSync, setIsSavingAutoSync] = useState(false);
+  const [isTriggeringAutoSync, setIsTriggeringAutoSync] = useState(false);
+  const [autoSyncFeedback, setAutoSyncFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // 1. Verify token on load
   useEffect(() => {
@@ -181,6 +206,90 @@ const Admin: React.FC = () => {
       setLogs([]);
     } catch (err) {
       console.error("Lỗi khi xóa log:", err);
+    }
+  };
+
+  const fetchAutoSync = async () => {
+    try {
+      const cfg = await getAutoSyncConfig();
+      setAutoSyncConfig(cfg);
+      setAutoSyncForm({
+        enabled: cfg.enabled,
+        interval_minutes: cfg.interval_minutes,
+        sync_chains: cfg.sync_chains,
+        date_range_days: cfg.date_range_days,
+      });
+    } catch (err) {
+      console.warn('Không thể tải cấu hình tự động đồng bộ:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (!token) return;
+    fetchAutoSync();
+  }, [token]);
+
+  const handleSaveAutoSync = async () => {
+    setIsSavingAutoSync(true);
+    setAutoSyncFeedback(null);
+    try {
+      const updated = await updateAutoSyncConfig(autoSyncForm);
+      setAutoSyncConfig(updated);
+      setAutoSyncFeedback({
+        type: 'success',
+        message: autoSyncForm.enabled
+          ? `Đã lưu lịch trình! Máy chủ sẽ tự động quét mỗi ${autoSyncForm.interval_minutes} phút.`
+          : 'Đã lưu cấu hình! Đã tắt lịch tự động đồng bộ ngầm.',
+      });
+      setTimeout(() => setAutoSyncFeedback(null), 4000);
+    } catch (err: any) {
+      setAutoSyncFeedback({
+        type: 'error',
+        message: err.message || 'Lỗi khi lưu cấu hình tự động đồng bộ.',
+      });
+    } finally {
+      setIsSavingAutoSync(false);
+    }
+  };
+
+  const handleTriggerAutoSyncNow = async () => {
+    setIsTriggeringAutoSync(true);
+    setAutoSyncFeedback(null);
+    try {
+      const res = await triggerAutoSyncRunNow();
+      setAutoSyncFeedback({
+        type: 'success',
+        message: res.message || 'Đã kích hoạt đồng bộ ngầm ngay bây giờ! Kiểm tra log bên dưới.',
+      });
+      setTimeout(async () => {
+        await fetchLogs();
+        const cfg = await getAutoSyncConfig();
+        setAutoSyncConfig(cfg);
+      }, 3000);
+    } catch (err: any) {
+      setAutoSyncFeedback({
+        type: 'error',
+        message: err.message || 'Không thể kích hoạt đồng bộ ngầm.',
+      });
+    } finally {
+      setIsTriggeringAutoSync(false);
+    }
+  };
+
+  const formatScheduleTime = (isoString?: string | null): string => {
+    if (!isoString) return 'Chưa có lịch';
+    try {
+      const d = parseUtcDate(isoString);
+      if (isNaN(d.getTime())) return isoString;
+      return d.toLocaleString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    } catch {
+      return isoString;
     }
   };
 
@@ -648,6 +757,235 @@ const Admin: React.FC = () => {
           </div>
         </div>
 
+        {/* === SECTION 2.2: AUTO-SYNC SCHEDULE & DAEMON CONFIGURATION === */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 backdrop-blur-xl shadow-2xl space-y-5">
+          {/* Header & Status Indicator */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-xl flex items-center justify-center">
+                <Clock size={22} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <h2 className="text-base font-black text-white tracking-tight">
+                    Cấu Hình Lịch Tự Động Đồng Bộ Ngầm (Auto-Sync Daemon)
+                  </h2>
+                  {autoSyncConfig?.enabled ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Đang Hoạt Động (Live)
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-800 text-slate-400 border border-slate-700">
+                      Đang Tạm Dừng
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Máy chủ tự động quét và tải dữ liệu định kỳ từ FPT Shop, Long Châu và Vaccine không cần người dùng thao tác
+                </p>
+              </div>
+            </div>
+
+            {/* Top Quick Actions */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleTriggerAutoSyncNow}
+                disabled={isTriggeringAutoSync || autoSyncConfig?.is_running}
+                className="px-3.5 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 font-bold text-xs rounded-xl border border-emerald-500/40 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                title="Bấm để kích hoạt tiến trình đồng bộ ngầm ngay bây giờ"
+              >
+                {isTriggeringAutoSync || autoSyncConfig?.is_running ? (
+                  <RefreshCw size={14} className="animate-spin" />
+                ) : (
+                  <Play size={14} fill="currentColor" />
+                )}
+                {isTriggeringAutoSync || autoSyncConfig?.is_running ? 'Đang Chạy Đồng Bộ...' : '⚡ Đồng Bộ Ngay'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveAutoSync}
+                disabled={isSavingAutoSync}
+                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isSavingAutoSync ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+                {isSavingAutoSync ? 'Đang Lưu...' : 'Lưu Cấu Hình'}
+              </button>
+            </div>
+          </div>
+
+          {/* Feedback banner */}
+          {autoSyncFeedback && (
+            <div className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-between gap-3 ${
+              autoSyncFeedback.type === 'success'
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+            }`}>
+              <div className="flex items-center gap-2">
+                {autoSyncFeedback.type === 'success' ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+                <span>{autoSyncFeedback.message}</span>
+              </div>
+              <button onClick={() => setAutoSyncFeedback(null)} className="text-slate-400 hover:text-white">✕</button>
+            </div>
+          )}
+
+          {/* Form Controls Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            {/* Card 1: Master Enable / Disable Toggle */}
+            <div className="p-4 bg-slate-950/70 border border-slate-800/90 rounded-xl flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Trạng Thái Tiến Trình</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={autoSyncForm.enabled}
+                    onClick={() => setAutoSyncForm(prev => ({ ...prev, enabled: !prev.enabled }))}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      autoSyncForm.enabled ? 'bg-indigo-600' : 'bg-slate-700'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        autoSyncForm.enabled ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+                <div className="text-sm font-bold text-white">
+                  {autoSyncForm.enabled ? 'Bật Tự Động Định Kỳ' : 'Tắt Tự Động (Chỉ Thủ Công)'}
+                </div>
+                <p className="text-[11.5px] text-slate-400 mt-1 leading-relaxed">
+                  {autoSyncForm.enabled 
+                    ? 'Máy chủ chạy thread ngầm độc lập, tự động quét theo chu kỳ bên cạnh.' 
+                    : 'Máy chủ sẽ không tự động quét dữ liệu cho đến khi được bật lại.'}
+                </p>
+              </div>
+            </div>
+
+            {/* Card 2: Interval & Date Range */}
+            <div className="p-4 bg-slate-950/70 border border-slate-800/90 rounded-xl space-y-3">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1.5">
+                  <Clock size={13} className="text-indigo-400" /> Chu Kỳ Quét Định Kỳ
+                </label>
+                <select
+                  value={autoSyncForm.interval_minutes}
+                  onChange={e => setAutoSyncForm(prev => ({ ...prev, interval_minutes: Number(e.target.value) }))}
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 text-white rounded-lg text-xs font-bold focus:outline-none focus:border-indigo-500 cursor-pointer"
+                >
+                  <option value={15}>Mỗi 15 phút</option>
+                  <option value={30}>Mỗi 30 phút</option>
+                  <option value={60}>Mỗi 1 giờ (Khuyên dùng)</option>
+                  <option value={120}>Mỗi 2 giờ</option>
+                  <option value={240}>Mỗi 4 giờ</option>
+                  <option value={720}>Mỗi 12 giờ</option>
+                  <option value={1440}>Mỗi 24 giờ (1 ngày/lần)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1.5">
+                  <Calendar size={13} className="text-indigo-400" /> Khoảng Thời Gian Dữ Liệu
+                </label>
+                <select
+                  value={autoSyncForm.date_range_days}
+                  onChange={e => setAutoSyncForm(prev => ({ ...prev, date_range_days: Number(e.target.value) }))}
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 text-white rounded-lg text-xs font-bold focus:outline-none focus:border-indigo-500 cursor-pointer"
+                >
+                  <option value={7}>7 ngày gần nhất</option>
+                  <option value={14}>14 ngày gần nhất</option>
+                  <option value={30}>30 ngày gần nhất (Tiêu chuẩn)</option>
+                  <option value={60}>60 ngày gần nhất</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Card 3: Chains Selection */}
+            <div className="p-4 bg-slate-950/70 border border-slate-800/90 rounded-xl space-y-2">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1.5">
+                <Layers size={13} className="text-indigo-400" /> Chuỗi Áp Dụng Đồng Bộ
+              </label>
+              <div className="grid grid-cols-1 gap-1.5">
+                {[
+                  { id: 'fpt_shop', label: 'FPT Shop', badge: 'CallLog Excel (Headless)' },
+                  { id: 'long_chau', label: 'Long Châu', badge: 'Budibase Report API' },
+                  { id: 'vaccine', label: 'Vaccine', badge: 'Budibase Export API' },
+                ].map(c => {
+                  const isChecked = autoSyncForm.sync_chains.includes(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        setAutoSyncForm(prev => {
+                          const exists = prev.sync_chains.includes(c.id);
+                          if (exists) {
+                            if (prev.sync_chains.length <= 1) return prev;
+                            return { ...prev, sync_chains: prev.sync_chains.filter(x => x !== c.id) };
+                          }
+                          return { ...prev, sync_chains: [...prev.sync_chains, c.id] };
+                        });
+                      }}
+                      className={`px-3 py-2 rounded-lg border text-left flex items-center justify-between transition-all cursor-pointer ${
+                        isChecked
+                          ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-200 font-bold'
+                          : 'bg-slate-900/60 border-slate-800 text-slate-500 hover:text-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className={`w-3.5 h-3.5 rounded flex items-center justify-center text-[10px] ${
+                          isChecked ? 'bg-indigo-600 text-white' : 'border border-slate-700 bg-slate-800'
+                        }`}>
+                          {isChecked && '✓'}
+                        </span>
+                        <span>{c.label}</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono">{c.badge}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+          </div>
+
+          {/* Schedule Metrics Bar */}
+          <div className="p-3.5 bg-slate-950/80 border border-slate-800 rounded-xl grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+            <div className="space-y-0.5">
+              <span className="text-slate-400 font-medium">Lần Đồng Bộ Gần Nhất:</span>
+              <div className="font-mono text-slate-200 font-bold flex items-center gap-2">
+                <span>{formatScheduleTime(autoSyncConfig?.last_run_at)}</span>
+                {autoSyncConfig?.last_status && (
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    autoSyncConfig.last_status === 'SUCCESS' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                    autoSyncConfig.last_status === 'PARTIAL' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                    'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                  }`}>
+                    {autoSyncConfig.last_status === 'SUCCESS' ? 'Thành công' : autoSyncConfig.last_status === 'PARTIAL' ? 'Một phần' : 'Có lỗi'}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-0.5">
+              <span className="text-slate-400 font-medium">Lần Đồng Bộ Kế Tiếp:</span>
+              <div className="font-mono text-indigo-400 font-bold">
+                {autoSyncForm.enabled ? formatScheduleTime(autoSyncConfig?.next_run_at) : 'Đang tạm dừng'}
+              </div>
+            </div>
+
+            <div className="space-y-0.5">
+              <span className="text-slate-400 font-medium">Ghi Chú Kết Quả Gần Nhất:</span>
+              <div className="text-slate-300 truncate" title={autoSyncConfig?.last_message || 'Chưa có dữ liệu'}>
+                {autoSyncConfig?.last_message || 'Chưa có thông tin'}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* === SECTION 2.5: LIVE LOG CONSOLE & SYNC DIAGNOSTICS === */}
         <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 backdrop-blur-xl shadow-2xl space-y-4">
           
@@ -913,7 +1251,7 @@ const Admin: React.FC = () => {
                       <p className="text-slate-400 text-[11px] leading-relaxed">{n.message}</p>
                     </div>
                     <span className="text-[10px] text-slate-500 shrink-0 font-mono">
-                      {n.created_at ? new Date(n.created_at).toLocaleTimeString() : ''}
+                      {n.created_at ? parseUtcDate(n.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''}
                     </span>
                   </div>
                 ))

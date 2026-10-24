@@ -51,6 +51,29 @@ class BaseBrowserSession:
         self.status = "STOPPED"
         self.is_headless = False
         self._lock = threading.RLock()
+        self.temp_creds = self._load_creds()
+
+    def _save_creds(self, creds: dict):
+        try:
+            creds_dir = os.path.abspath(os.path.join(os.getcwd(), ".browser"))
+            os.makedirs(creds_dir, exist_ok=True)
+            creds_file = os.path.join(creds_dir, f"{self.profile_name}_creds.json")
+            import json
+            with open(creds_file, "w", encoding="utf-8") as f:
+                json.dump(creds, f)
+        except Exception:
+            pass
+
+    def _load_creds(self) -> dict:
+        try:
+            creds_file = os.path.abspath(os.path.join(os.getcwd(), ".browser", f"{self.profile_name}_creds.json"))
+            if os.path.exists(creds_file):
+                import json
+                with open(creds_file, "r", encoding="utf-8") as f:
+                    return json.load(f)
+        except Exception:
+            pass
+        return {}
 
     def _cleanup_orphaned_processes(self, profile_path: str):
         try:

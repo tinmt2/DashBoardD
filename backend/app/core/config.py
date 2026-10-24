@@ -1,8 +1,12 @@
+from pathlib import Path
 from pydantic_settings import BaseSettings
 from typing import Optional
 
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+DEFAULT_DB_PATH = (BASE_DIR / "opsmonitor.db").as_posix()
+
 class Settings(BaseSettings):
-    DATABASE_URL: str = "sqlite:///./opsmonitor.db"
+    DATABASE_URL: str = f"sqlite:///{DEFAULT_DB_PATH}"
     
     LONG_CHAU_LOGIN_URL: str = "https://bapp.frt.vn/app/frt-gscmr-long-chau"
     LONG_CHAU_AUTH_DOMAIN: str = "bapp.frt.vn"

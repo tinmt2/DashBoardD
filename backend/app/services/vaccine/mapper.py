@@ -206,6 +206,8 @@ class VaccineColumnMapper:
 
         row.error_type = self.error_mapper.map_error_type(raw("error_type"))
         row.error_description = self.error_mapper.map_error_description(raw("error_description"))
+        if not row.error_description and (row.violation_content or row.error_type):
+            row.error_description = row.violation_content or row.error_type
 
         row.raw_requested_date = raw("requested_date")
         req = self.date_parser.parse(row.raw_requested_date)

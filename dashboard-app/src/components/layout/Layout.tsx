@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Activity, LayoutDashboard, Map, Users, ShieldAlert, Settings, Bell, Palette, 
   Save, X, Store, Pill, ShieldPlus, BarChart3, Users2, ChevronLeft, ChevronRight,
-  CheckCircle2, AlertCircle, Eye, EyeOff, Menu, RefreshCw
+  CheckCircle2, AlertCircle, Eye, EyeOff, Menu, RefreshCw, Clock, Calendar, Layers, Check, Loader2, Play
 } from 'lucide-react';
 import TitleBar from './TitleBar';
 import { getFptShopAuthStatus, startFptShopAuth } from '../../services/fptShopApi';
 import { startLongChauAuth } from '../../services/longChauApi';
 import { startVaccineAuth } from '../../services/vaccineApi';
+import { getAutoSyncConfig, updateAutoSyncConfig, triggerAutoSyncRunNow, AutoSyncConfig } from '../../services/autoSyncApi';
 import { useNotification } from '../../context/NotificationContext';
 import { useSync } from '../../context/SyncContext';
 import { RealtimeSyncBanner, CircularSpinner } from '../common/CircularSpinner';
@@ -29,6 +30,7 @@ export const SidebarContext = React.createContext<SidebarContextType>({
 export const useSidebar = () => React.useContext(SidebarContext);
 
 const Layout: React.FC = () => {
+  const navigate = useNavigate();
   const { unreadCount, togglePanel } = useNotification();
   const { isSyncing, syncStepText, syncDuration, syncToast, setSyncToast, syncAll, syncChain } = useSync();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -129,6 +131,12 @@ const Layout: React.FC = () => {
       startLongChauAuth(fptCreds).catch(() => {});
       startVaccineAuth(fptCreds).catch(() => {});
     }
+    setSyncToast({
+      show: true,
+      type: 'success',
+      title: 'Đã lưu tài khoản Inside',
+      subtitle: 'Hệ thống sẽ dùng tài khoản này để tự động xác thực các chuỗi',
+    });
   };
 
   const location = useLocation();
@@ -547,51 +555,91 @@ const Layout: React.FC = () => {
             </div>
             
             {isSettingsOpen && createPortal(
-              <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-                <div className="bg-white rounded-xl shadow-xl w-[400px] max-w-[90vw] overflow-hidden">
-                  <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
-                    <h3 className="font-semibold text-slate-800 flex items-center gap-2">
-                      <Settings size={18} className="text-indigo-600" /> Cài đặt Tài khoản Inside
+              <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-fade-in">
+                <div className="bg-white rounded-2xl shadow-2xl w-[440px] max-w-[92vw] overflow-hidden border border-slate-100">
+                  <div className="flex items-center justify-between p-4.5 border-b border-slate-100 bg-slate-50/80">
+                    <h3 className="font-bold text-slate-800 flex items-center gap-2 text-base">
+                      <Settings size={19} className="text-indigo-600" /> Cài đặt Tài khoản Inside
                     </h3>
-                    <button onClick={() => setIsSettingsOpen(false)} className="text-slate-400 hover:text-rose-500 transition-colors">
-                      <X size={20} />
+                    <button 
+                      onClick={() => setIsSettingsOpen(false)} 
+                      className="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <X size={18} />
                     </button>
                   </div>
+
                   <div className="p-5 space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Tài khoản (Username)</label>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Tài khoản Inside (Username)</label>
                       <input 
                         type="text" 
                         value={fptCreds.username} 
                         onChange={e => setFptCreds({...fptCreds, username: e.target.value})} 
-                        className="w-full px-3 py-2 bg-white text-slate-900 placeholder:text-slate-400 font-medium border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm" 
-                        placeholder="Nhập tên đăng nhập" 
+                        className="w-full px-3.5 py-2.5 bg-white text-slate-900 placeholder:text-slate-400 font-medium border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm shadow-xs" 
+                        placeholder="Nhập tên đăng nhập Inside / SSO" 
                       />
                     </div>
+
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Mật khẩu (Password)</label>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Mật khẩu (Password)</label>
                       <div className="relative flex items-center">
                         <input 
                           type={showPassword ? "text" : "password"} 
                           value={fptCreds.password} 
                           onChange={e => setFptCreds({...fptCreds, password: e.target.value})} 
-                          className="w-full px-3 py-2 pr-10 bg-white text-slate-900 placeholder:text-slate-400 font-medium border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm" 
+                          className="w-full px-3.5 py-2.5 pr-10 bg-white text-slate-900 placeholder:text-slate-400 font-medium border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm shadow-xs" 
                           placeholder="Nhập mật khẩu" 
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(prev => !prev)}
-                          className="absolute right-2.5 text-slate-400 hover:text-slate-600 p-1 cursor-pointer transition-colors"
+                          className="absolute right-3 text-slate-400 hover:text-slate-600 p-1 cursor-pointer transition-colors"
                           title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
                         >
                           {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                         </button>
                       </div>
                     </div>
+
+                    <div className="p-3 bg-indigo-50/70 border border-indigo-100 rounded-xl text-xs text-indigo-900 leading-relaxed">
+                      💡 Tài khoản Inside được sử dụng chung để xác thực và đồng bộ dữ liệu cho cả 3 chuỗi: <strong>FPT Shop</strong>, <strong>Long Châu</strong>, và <strong>Vaccine</strong>.
+                    </div>
+
+                    {/* Admin Auto-Sync Banner Link */}
+                    <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-2 text-slate-700">
+                        <Clock size={16} className="text-indigo-600 shrink-0" />
+                        <span>Lịch tự động đồng bộ ngầm được quản lý tại trang <strong>Quản trị Admin</strong>.</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsSettingsOpen(false);
+                          navigate('/admin');
+                        }}
+                        className="px-2.5 py-1 text-xs font-bold text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer shrink-0"
+                      >
+                        Quản lý →
+                      </button>
+                    </div>
                   </div>
-                  <div className="p-4 border-t border-slate-100 flex justify-end gap-2 bg-slate-50">
-                    <button onClick={() => setIsSettingsOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">Hủy</button>
-                    <button onClick={saveSettings} className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors flex items-center gap-2"><Save size={16} /> Lưu cài đặt</button>
+
+                  <div className="p-4 border-t border-slate-100 flex justify-end gap-2.5 bg-slate-50/80">
+                    <button 
+                      type="button"
+                      onClick={() => setIsSettingsOpen(false)} 
+                      className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
+                    >
+                      Hủy
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={saveSettings} 
+                      className="px-5 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors flex items-center gap-2 cursor-pointer shadow-sm"
+                    >
+                      <Save size={16} /> Lưu cài đặt
+                    </button>
                   </div>
                 </div>
               </div>,

@@ -189,12 +189,37 @@ class LongChauImportService:
             records: List[TicketRecord] = []
             details: List[LongChauTicketDetail] = []
             duplicate_count = 0
+            updated_count = 0
             for p in payload:
                 key = p["dedup_key"]
-                if key in existing or key in seen:
+                if key in seen:
                     duplicate_count += 1
                     continue
                 seen.add(key)
+
+                if key in existing:
+                    duplicate_count += 1
+                    detail = self.db.query(LongChauTicketDetail).filter(LongChauTicketDetail.dedup_key == key).first()
+                    if detail:
+                        d = p["detail"]
+                        if d.get("step"): detail.step = d.get("step")
+                        if d.get("step_status"): detail.step_status = d.get("step_status")
+                        if d.get("approver"): detail.approver = d.get("approver")
+                        if d.get("expected_completion_date"):
+                            try:
+                                detail.expected_completion_date = date.fromisoformat(d["expected_completion_date"])
+                            except:
+                                pass
+                        if d.get("employee_raw") and not detail.employee_raw:
+                            detail.employee_raw = d.get("employee_raw")
+                            
+                        ticket = self.db.query(Ticket).filter(Ticket.id == detail.ticket_record_id).first()
+                        if ticket:
+                            rec_data = p["record"]
+                            if rec_data.get("ticket_status") and ticket.ticket_status != rec_data["ticket_status"]:
+                                ticket.ticket_status = rec_data["ticket_status"]
+                                updated_count += 1
+                    continue
 
                 rec_data = dict(p["record"])
                 rec_data["chain"] = CHAIN_LONG_CHAU  # enforce, regardless of stored payload
@@ -247,8 +272,8 @@ class LongChauImportService:
             return {"success": False, "importId": import_id, "error_message": str(exc)}
 
         logger.info(
-            "[LONG_CHAU_IMPORT] commit import_id=%s inserted=%d duplicates=%d",
-            import_id, job.new_rows, job.duplicate_rows,
+            "[LONG_CHAU_IMPORT] commit import_id=%s inserted=%d updated=%d duplicates=%d",
+            import_id, job.new_rows, updated_count, job.duplicate_rows,
         )
         return {
             "success": True,

@@ -194,30 +194,61 @@ class VaccineImportService:
                 key = p["dedup_key"]
                 d = p["detail"]
                 rec_data = dict(p["record"])
-                if key in existing or key in seen:
+
+                matched_detail = None
+                if key in existing:
+                    matched_detail = self.db.query(VaccineTicketDetail).filter(VaccineTicketDetail.dedup_key == key).first()
+
+                # Fallback match: if dedup_key didn't match (e.g. employee was updated or cleared on appeal),
+                # find existing record by ticket_id and error_type that hasn't been matched yet in this commit batch
+                if not matched_detail and key not in seen:
+                    tid = d.get("ticket_id") or rec_data.get("ticket_id")
+                    err_type = rec_data.get("error_type")
+                    if tid and err_type:
+                        candidates = self.db.query(VaccineTicketDetail).join(
+                            Ticket, VaccineTicketDetail.ticket_record_id == Ticket.id
+                        ).filter(
+                            VaccineTicketDetail.chain == CHAIN_VACCINE,
+                            VaccineTicketDetail.ticket_id == tid,
+                            Ticket.error_type == err_type,
+                        ).all()
+                        for cand in candidates:
+                            if cand.dedup_key not in seen and cand.ticket_record_id not in seen:
+                                matched_detail = cand
+                                break
+
+                if matched_detail or key in seen:
                     duplicate_count += 1
-                    if key in existing:
-                        existing_detail = self.db.query(VaccineTicketDetail).filter(VaccineTicketDetail.dedup_key == key).first()
-                        if existing_detail:
-                            if d.get("summary") is not None:
-                                existing_detail.summary = d.get("summary")
-                            if d.get("step_status") is not None:
-                                existing_detail.step_status = d.get("step_status")
-                            if d.get("step") is not None:
-                                existing_detail.step = d.get("step")
-                            if d.get("punishment") is not None:
-                                existing_detail.punishment = d.get("punishment")
-                            if d.get("vaccine_type") is not None:
-                                existing_detail.vaccine_type = d.get("vaccine_type")
-                            if d.get("violation_content") is not None:
-                                existing_detail.violation_content = d.get("violation_content")
-                            if rec_data.get("ticket_status") or rec_data.get("error_status"):
-                                existing_ticket = self.db.query(Ticket).filter(Ticket.id == existing_detail.ticket_record_id).first()
-                                if existing_ticket:
-                                    if rec_data.get("ticket_status"):
-                                        existing_ticket.ticket_status = rec_data.get("ticket_status")
-                                    if rec_data.get("error_status"):
-                                        existing_ticket.error_status = rec_data.get("error_status")
+                    if matched_detail:
+                        seen.add(matched_detail.dedup_key)
+                        seen.add(matched_detail.ticket_record_id)
+                        # Keep dedup_key up to date
+                        matched_detail.dedup_key = key
+                        if d.get("summary") is not None:
+                            matched_detail.summary = d.get("summary")
+                        if d.get("step_status") is not None:
+                            matched_detail.step_status = d.get("step_status")
+                        if d.get("step") is not None:
+                            matched_detail.step = d.get("step")
+                        if d.get("punishment") is not None:
+                            matched_detail.punishment = d.get("punishment")
+                        if d.get("vaccine_type") is not None:
+                            matched_detail.vaccine_type = d.get("vaccine_type")
+                        if d.get("violation_content") is not None:
+                            matched_detail.violation_content = d.get("violation_content")
+                        if d.get("employee_raw") is not None:
+                            matched_detail.employee_raw = d.get("employee_raw")
+
+                        existing_ticket = self.db.query(Ticket).filter(Ticket.id == matched_detail.ticket_record_id).first()
+                        if existing_ticket:
+                            if rec_data.get("ticket_status"):
+                                existing_ticket.ticket_status = rec_data.get("ticket_status")
+                            if rec_data.get("error_status"):
+                                existing_ticket.error_status = rec_data.get("error_status")
+                            if rec_data.get("employee_id") is not None:
+                                existing_ticket.employee_id = rec_data.get("employee_id")
+                            if rec_data.get("employee_name") is not None:
+                                existing_ticket.employee_name = rec_data.get("employee_name")
                     continue
                 seen.add(key)
 

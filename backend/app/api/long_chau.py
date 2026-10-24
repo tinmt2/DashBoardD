@@ -63,6 +63,8 @@ class AuthStartReq(BaseModel):
 
 class OtpRequest(BaseModel):
     otp: str
+    username: Optional[str] = ""
+    password: Optional[str] = ""
 
 class SyncRequest(BaseModel):
     start_date: str
@@ -73,13 +75,14 @@ def long_chau_auth_start(req: Optional[AuthStartReq] = None):
     session = LongChauBrowserSession.get_instance()
     if req:
         session.temp_creds = req.dict()
+        session._save_creds(session.temp_creds)
     status = session.start()
     return {"authenticated": status == "AUTHENTICATED", "status": status}
 
 @router.post("/auth/otp")
 def long_chau_auth_otp(req: OtpRequest):
     session = LongChauBrowserSession.get_instance()
-    status = session.submit_otp(req.otp)
+    status = session.submit_otp(req.otp, username=req.username, password=req.password)
     return {"authenticated": status == "AUTHENTICATED", "status": status}
 
 @router.get("/auth/status")

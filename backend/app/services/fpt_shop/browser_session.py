@@ -17,7 +17,7 @@ class FPTBrowserSession(BaseBrowserSession):
             profile_name="fpt-shop-profile",
             start_url="https://calllog.fptshop.com.vn/Report/DebtConfirm"
         )
-        self.temp_creds = None
+        self.temp_creds = self._load_creds()
         
     @classmethod
     def get_instance(cls):
@@ -157,7 +157,10 @@ class FPTBrowserSession(BaseBrowserSession):
 
                     if "tài khoản hoặc mật khẩu không chính xác" in page_source:
                         self.status = "LOGIN_FAILED"
-                    elif has_otp_field or "vui lòng nhập mã otp" in page_source or "mã xác thực không hợp lệ" in page_source or "mã xác nhận không đúng" in page_source:
+                    elif "mã xác thực không hợp lệ" in page_source or "mã xác nhận không đúng" in page_source or "mã otp không đúng" in page_source or "otp không chính xác" in page_source:
+                        self.status = "OTP_INVALID"
+                        self._force_show_window()
+                    elif has_otp_field or "vui lòng nhập mã otp" in page_source:
                         self.status = "OTP_REQUIRED"
                         self._force_show_window()
                     else:
@@ -223,35 +226,67 @@ class FPTBrowserSession(BaseBrowserSession):
                 
             return self.status
 
-    def submit_otp(self, otp: str) -> str:
+    def submit_otp(self, otp: str, username: str = "", password: str = "") -> str:
         with self._lock:
             if not self.driver:
                 return "STOPPED"
             try:
+                if username and password:
+                    self.temp_creds = {"username": username, "password": password}
+                    self._save_creds(self.temp_creds)
+
+                user = username or (self.temp_creds.get("username") if getattr(self, "temp_creds", None) else "")
+                pwd = password or (self.temp_creds.get("password") if getattr(self, "temp_creds", None) else "")
+
                 js = """
-                let otpInput = document.querySelector('input[name="LoginInput.Otp"]') || document.querySelector('input.input-otp') || document.querySelector('input[formcontrolname="otp"]') || document.querySelector('input[placeholder*="OTP"]');
                 let code = arguments[0];
+                let user = arguments[1] || "";
+                let pass = arguments[2] || "";
+
+                let acc = document.querySelector('input[name="LoginInput.UserNameOrEmailAddress"]') || document.querySelector('input[formcontrolname="employee_code"]') || document.querySelector('input[name="UserName"]') || document.querySelector('input[type="text"]');
+                let pwdInput = document.querySelector('input[name="LoginInput.Password"]') || document.querySelector('input[formcontrolname="password"]') || document.querySelector('input[type="password"]');
+                let otpInput = document.querySelector('input[name="LoginInput.Otp"]') || document.querySelector('input.input-otp') || document.querySelector('input[formcontrolname="otp"]') || document.querySelector('input[placeholder*="OTP"]');
+
+                const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+
+                if (acc && (user || !acc.value)) {
+                    let u = user || acc.value;
+                    if (u) {
+                        nativeInputValueSetter.call(acc, u);
+                        acc.dispatchEvent(new Event('input', { bubbles: true }));
+                        acc.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }
+
+                if (pwdInput && (pass || !pwdInput.value)) {
+                    let p = pass || pwdInput.value;
+                    if (p) {
+                        nativeInputValueSetter.call(pwdInput, p);
+                        pwdInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        pwdInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }
+
                 if (otpInput && code) {
-                    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
                     nativeInputValueSetter.call(otpInput, code);
                     otpInput.dispatchEvent(new Event('input', { bubbles: true }));
                     otpInput.dispatchEvent(new Event('change', { bubbles: true }));
-                    
-                    let btn = document.querySelector('#kt_login_signin_submit') || document.querySelector('button[type="submit"]') || document.querySelector('.kt-login__btn-primary');
-                    if (btn) {
-                        btn.click();
-                        return true;
-                    }
+                }
+
+                let btn = document.querySelector('#kt_login_signin_submit') || document.querySelector('button[type="submit"]') || document.querySelector('.kt-login__btn-primary');
+                if (btn) {
+                    btn.click();
+                    return true;
                 }
                 return false;
                 """
-                self.driver.execute_script(js, otp)
+                self.driver.execute_script(js, otp, user, pwd)
                 
                 import time
-                for _ in range(8):
+                for _ in range(16):
                     time.sleep(0.5)
                     st = self.get_status()
-                    if st in ("AUTHENTICATED", "LOGIN_FAILED"):
+                    if st in ("AUTHENTICATED", "LOGIN_FAILED", "OTP_INVALID"):
                         return st
                 return self.get_status()
             except Exception as e:

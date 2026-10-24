@@ -166,13 +166,16 @@ def admin_overview(db: Session = Depends(get_db)):
     try:
         notifs = db.query(SyncNotification).order_by(SyncNotification.created_at.desc()).limit(10).all()
         for n in notifs:
+            created_dt = n.created_at
+            if created_dt and created_dt.tzinfo is None:
+                created_dt = created_dt.replace(tzinfo=timezone.utc)
             recent_notifs.append({
                 "id": n.id,
-                "chain": n.chain,
+                "chain": getattr(n, "chain", None) or n.sync_type,
                 "title": n.title,
-                "message": n.message,
+                "message": getattr(n, "message", None) or n.error_message or "",
                 "status": n.status,
-                "created_at": n.created_at.isoformat() if n.created_at else None
+                "created_at": created_dt.isoformat() if created_dt else None
             })
     except Exception:
         pass

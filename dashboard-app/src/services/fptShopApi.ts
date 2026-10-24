@@ -115,11 +115,11 @@ export const getFptShopAuthStatus = async (signal?: AbortSignal): Promise<AuthSt
     return response.json();
 };
 
-export const submitFptShopOtp = async (otp: string, signal?: AbortSignal): Promise<AuthStatusResponse> => {
+export const submitFptShopOtp = async (otp: string, username?: string, password?: string, signal?: AbortSignal): Promise<AuthStatusResponse> => {
     const response = await fetch(`${API_BASE_URL}/api/fpt-shop/auth/otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ otp }),
+        body: JSON.stringify({ otp, username: username || '', password: password || '' }),
         signal
     });
     if (!response.ok) {

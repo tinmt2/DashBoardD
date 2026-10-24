@@ -53,19 +53,22 @@ class AuthStartReq(BaseModel):
 
 class OtpRequest(BaseModel):
     otp: str
+    username: Optional[str] = ""
+    password: Optional[str] = ""
 
 @router.post("/auth/start")
 def vaccine_auth_start(req: Optional[AuthStartReq] = None):
     session = VaccineBrowserSession.get_instance()
     if req:
         session.temp_creds = req.dict()
+        session._save_creds(session.temp_creds)
     status = session.start()
     return {"authenticated": status == "AUTHENTICATED", "status": status}
 
 @router.post("/auth/otp")
 def vaccine_auth_otp(req: OtpRequest):
     session = VaccineBrowserSession.get_instance()
-    status = session.submit_otp(req.otp)
+    status = session.submit_otp(req.otp, username=req.username, password=req.password)
     return {"authenticated": status == "AUTHENTICATED", "status": status}
 
 @router.get("/auth/status")

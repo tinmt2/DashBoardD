@@ -112,11 +112,11 @@ export const getVaccineAuthStatus = async (signal?: AbortSignal): Promise<AuthSt
     return response.json();
 };
 
-export const submitVaccineOtp = async (otp: string, signal?: AbortSignal): Promise<AuthStatusResponse> => {
+export const submitVaccineOtp = async (otp: string, username?: string, password?: string, signal?: AbortSignal): Promise<AuthStatusResponse> => {
     const response = await fetch(`${API_BASE_URL}/api/vaccine/auth/otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ otp }),
+        body: JSON.stringify({ otp, username: username || '', password: password || '' }),
         signal
     });
     if (!response.ok) {

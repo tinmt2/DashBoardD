@@ -195,15 +195,28 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
     setIsSubmittingOtp(true);
     setOtpError(null);
     try {
+      let freshCreds = { username: '', password: '' };
+      try {
+        const saved = localStorage.getItem('fptCreds');
+        if (saved) freshCreds = JSON.parse(saved);
+      } catch (e) {}
+
+      if (!freshCreds.username || !freshCreds.password) {
+        setOtpError('Chưa có Tài khoản và Mật khẩu. Vui lòng cấu hình trong phần Cài đặt.');
+        window.dispatchEvent(new CustomEvent('open-inside-settings'));
+        setIsSubmittingOtp(false);
+        return;
+      }
+
       let res: AuthStatusResponse;
       if (chain === 'Vaccine') {
-        res = await submitVaccineOtp(otpCode);
+        res = await submitVaccineOtp(otpCode, freshCreds.username, freshCreds.password);
         setVaccineAuth(res);
       } else if (chain === 'Long Châu') {
-        res = await submitLongChauOtp(otpCode);
+        res = await submitLongChauOtp(otpCode, freshCreds.username, freshCreds.password);
         setLongChauAuth(res);
       } else {
-        res = await submitFptShopOtp(otpCode);
+        res = await submitFptShopOtp(otpCode, freshCreds.username, freshCreds.password);
         setFptAuth(res);
       }
       if (res.authenticated) {
@@ -214,10 +227,12 @@ const Dashboard: React.FC<Props> = ({ chain }) => {
           title: `Đăng nhập ${chain || 'FPT Shop'} thành công`,
           subtitle: 'Phiên làm việc đã sẵn sàng để đồng bộ.'
         });
+      } else if (res.status === 'OTP_INVALID') {
+        setOtpError('Mã OTP không chính xác hoặc đã hết hạn trên Authy. Vui lòng lấy mã mới nhất.');
       } else if (res.status === 'LOGIN_FAILED') {
-        setOtpError('Tài khoản, mật khẩu hoặc mã OTP không chính xác.');
+        setOtpError('Tài khoản hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại cấu hình.');
       } else {
-        setOtpError('Chưa xác thực được. Vui lòng kiểm tra lại mã OTP.');
+        setOtpError('Chưa xác thực được. Vui lòng kiểm tra lại mã OTP mới nhất từ Authy.');
       }
     } catch (err: any) {
       setOtpError(err.message || 'Lỗi khi gửi mã OTP');

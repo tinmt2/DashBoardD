@@ -20,6 +20,10 @@ class NotificationRepository:
             except Exception:
                 chain_details_list = []
 
+        created_at_val = item.created_at
+        if created_at_val and created_at_val.tzinfo is None:
+            created_at_val = created_at_val.replace(tzinfo=timezone.utc)
+
         return NotificationResponse(
             id=item.id,
             title=item.title,
@@ -33,7 +37,7 @@ class NotificationRepository:
             chain_details=chain_details_list,
             error_message=item.error_message,
             is_read=bool(item.is_read),
-            created_at=item.created_at
+            created_at=created_at_val
         )
 
     def create(self, data: NotificationCreate) -> NotificationResponse:

@@ -1,6 +1,6 @@
 export type NotificationStatus = 'SUCCESS' | 'FAILED' | 'PARTIAL';
 
-export type SyncType = 'SYNC_ALL' | 'FPT_SHOP' | 'LONG_CHAU' | 'VACCINE' | 'IMPORT_EXCEL';
+export type SyncType = 'SYNC_ALL' | 'FPT_SHOP' | 'LONG_CHAU' | 'VACCINE' | 'IMPORT_EXCEL' | 'AUTO_SYNC';
 
 export interface ChainSyncDetail {
   chain: string; // 'FPT Shop' | 'Long Châu' | 'Vaccine'

@@ -3,66 +3,11 @@ import { createPortal } from 'react-dom';
 import { X, RefreshCw, CheckCheck, Trash2 } from 'lucide-react';
 import { useNotification } from '../../context/NotificationContext';
 import { SyncNotificationItem } from '../../types/notification';
+import { formatTimeAgo, formatFullDate, formatDateShort } from '../../utils/dateUtils';
 
 const formatNumber = (num?: number | null) => {
   if (num === undefined || num === null || isNaN(num)) return '0';
   return new Intl.NumberFormat('vi-VN').format(num);
-};
-
-const formatTimeAgo = (dateStr: string) => {
-  try {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffSec = Math.floor(diffMs / 1000);
-    const diffMin = Math.floor(diffSec / 60);
-    const diffHour = Math.floor(diffMin / 60);
-    const diffDay = Math.floor(diffHour / 24);
-
-    if (diffSec < 45) return 'Vừa xong';
-    if (diffMin < 60) return `${diffMin} phút trước`;
-    if (diffHour < 24) return `${diffHour} giờ trước`;
-    if (diffDay < 7) return `${diffDay} ngày trước`;
-
-    return date.toLocaleDateString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  } catch {
-    return dateStr;
-  }
-};
-
-const formatFullDate = (dateStr: string) => {
-  try {
-    const date = new Date(dateStr);
-    return date.toLocaleString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
-  } catch {
-    return dateStr;
-  }
-};
-
-const formatDateShort = (dStr?: string | null) => {
-  if (!dStr) return '';
-  try {
-    const parts = dStr.split('-');
-    if (parts.length === 3) {
-      return `${parts[2]}/${parts[1]}/${parts[0]}`;
-    }
-    return dStr;
-  } catch {
-    return dStr;
-  }
 };
 
 const formatErrorMessage = (msg?: string | null): string => {
@@ -87,6 +32,9 @@ const getChainUnit = (chainName: string): string => {
   const lower = (chainName || '').toLowerCase();
   if (lower.includes('fpt') || lower.includes('shop')) {
     return 'calllog';
+  }
+  if (lower.includes('vaccine')) {
+    return 'phiếu';
   }
   return 'ticket';
 };
@@ -242,7 +190,7 @@ const NotificationPanel: React.FC = () => {
         </div>
 
         {/* Notification List Body */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 bg-slate-50/50">
+        <div className="flex-1 overflow-y-auto p-3.5 sm:p-4 space-y-2 bg-slate-50/60">
           {filteredNotifications.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-8 text-slate-400">
               <h3 className="text-[14px] font-bold text-slate-700">Chưa có thông báo nào</h3>
@@ -305,16 +253,17 @@ interface CardProps {
 }
 
 /**
- * Streamlined & Optimized Notification Card:
- * Clean, lightweight, simple, without icons, focused on essential data.
+ * Minimalist Single-Layer Notification Item:
+ * Simple, clean, no nested card boxes, no icons, instantly readable at a glance.
  */
 const NotificationCard: React.FC<CardProps> = ({ item, onMarkRead, onDelete }) => {
   const isSuccess = item.status === 'SUCCESS';
   const isPartial = item.status === 'PARTIAL';
   const isFailed = item.status === 'FAILED';
 
-  const isMultiChain = item.sync_type === 'SYNC_ALL' || (item.chain_details && item.chain_details.length > 1);
+  const isMultiChain = item.sync_type === 'SYNC_ALL' || item.sync_type === 'AUTO_SYNC' || (item.chain_details && item.chain_details.length > 1);
   const isExcel = item.sync_type === 'IMPORT_EXCEL';
+  const isAutoSync = item.sync_type === 'AUTO_SYNC';
 
   const singleChainDetail = item.chain_details && item.chain_details.length === 1 ? item.chain_details[0] : null;
   const chainName = singleChainDetail?.chain || (
@@ -323,8 +272,8 @@ const NotificationCard: React.FC<CardProps> = ({ item, onMarkRead, onDelete }) =
     item.sync_type === 'VACCINE' ? 'Vaccine' : 'Hệ thống'
   );
 
-  const titleText = isMultiChain ? 'Đồng bộ tất cả 3 chuỗi' : chainName;
-  const modeText = isExcel ? 'Nhập Excel' : 'Tự động';
+  const titleText = isAutoSync ? (isMultiChain ? 'Tự động đồng bộ ngầm' : chainName) : (isMultiChain ? 'Đồng bộ tất cả 3 chuỗi' : chainName);
+  const modeText = isExcel ? 'Nhập Excel' : isAutoSync ? 'Định kỳ máy chủ' : 'Tự động';
   const totalNew = item.total_new_errors || (singleChainDetail?.new_records ?? 0);
   const unitLabel = getChainUnit(chainName);
 
@@ -333,58 +282,53 @@ const NotificationCard: React.FC<CardProps> = ({ item, onMarkRead, onDelete }) =
       onClick={() => {
         if (!item.is_read) onMarkRead();
       }}
-      className={`group relative bg-white rounded-xl p-3.5 border transition-all duration-150 cursor-pointer ${
+      className={`group relative bg-white rounded-xl p-3 border transition-all duration-150 cursor-pointer ${
         !item.is_read
-          ? 'border-indigo-200 bg-indigo-50/15 shadow-xs'
-          : 'border-slate-200/80 hover:border-slate-300 hover:shadow-xs'
+          ? 'border-indigo-200/90 bg-indigo-50/20 shadow-xs'
+          : 'border-slate-200/80 hover:border-slate-300 hover:bg-slate-50/40 shadow-xs'
       }`}
     >
-      {/* Top Header: Title, Time/Date, Status Badge & Delete Action */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            {!item.is_read && (
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 shrink-0" />
-            )}
-            <h4 className="text-[13.5px] font-bold text-slate-800 tracking-tight truncate">
-              {titleText}
-            </h4>
-            <span className="text-[11px] font-medium text-slate-400">
-              • {modeText}
-            </span>
-          </div>
-
-          {/* Meta line: Time & Date (Clean text, no icons) */}
-          <div className="flex items-center gap-1.5 mt-0.5 text-[11.5px] text-slate-400 font-medium flex-wrap">
-            <span title={formatFullDate(item.created_at)}>
-              {formatTimeAgo(item.created_at)}
-            </span>
-            {item.start_date && (
-              <>
-                <span className="text-slate-300">•</span>
-                <span className="text-slate-500">
-                  {formatDateShort(item.start_date)}
-                  {item.end_date && item.end_date !== item.start_date ? ` → ${formatDateShort(item.end_date)}` : ''}
-                </span>
-              </>
-            )}
-          </div>
+      {/* Row 1: Title, Metric or Status, and Close/Delete action */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          {!item.is_read && (
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 shrink-0" />
+          )}
+          <span className="text-[13.5px] font-bold text-slate-800 tracking-tight truncate">
+            {titleText}
+          </span>
+          <span className="text-[11px] font-medium text-slate-400 shrink-0">
+            • {modeText}
+          </span>
         </div>
 
-        {/* Right side: Status Badge (Clean text, no icons) & Delete */}
-        <div className="flex items-center gap-1 shrink-0">
-          {isSuccess ? (
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
-              Thành công
-            </span>
-          ) : isPartial ? (
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/80">
-              Một phần
-            </span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {isMultiChain ? (
+            isSuccess ? (
+              <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/70">
+                Thành công
+              </span>
+            ) : isPartial ? (
+              <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/70">
+                Một phần
+              </span>
+            ) : (
+              <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/70">
+                Thất bại
+              </span>
+            )
           ) : (
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/80">
-              Thất bại
-            </span>
+            isSuccess ? (
+              <span className={`text-[13px] font-bold ${
+                totalNew > 0 ? 'text-emerald-700 font-extrabold' : 'text-slate-600'
+              }`}>
+                {totalNew > 0 ? `+${formatNumber(totalNew)}` : '0'} {unitLabel}
+              </span>
+            ) : (
+              <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/70">
+                Thất bại
+              </span>
+            )
           )}
 
           <button
@@ -393,81 +337,81 @@ const NotificationCard: React.FC<CardProps> = ({ item, onMarkRead, onDelete }) =
               onDelete();
             }}
             title="Xoá thông báo"
-            className="p-1 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+            className="p-1 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer opacity-70 sm:opacity-0 sm:group-hover:opacity-100"
           >
             <X size={14} />
           </button>
         </div>
       </div>
 
-      {/* Main Body */}
-      {isMultiChain ? (
-        /* Multi-Chain Breakdown (No icons, clean compact rows) */
-        <div className="mt-2.5 pt-2.5 border-t border-slate-100 space-y-1.5">
-          {item.chain_details && item.chain_details.length > 0 ? (
-            item.chain_details.map((detail, idx) => {
-              const chainItemName = detail.chain;
-              const unit = getChainUnit(chainItemName);
-              const isOk = detail.status === 'SUCCESS';
-              const newCount = detail.new_records || 0;
-
-              return (
-                <div 
-                  key={idx}
-                  className={`py-1.5 px-2.5 rounded-lg flex items-center justify-between text-[12.5px] transition-colors ${
-                    isOk ? 'bg-slate-50/80' : 'bg-rose-50/60 border border-rose-100'
-                  }`}
-                >
-                  <span className="font-semibold text-slate-700">
-                    {chainItemName}
-                  </span>
-
-                  {isOk ? (
-                    <div className="flex items-center gap-1 shrink-0">
-                      <span className="text-[11px] text-slate-400 font-medium">Cập nhật:</span>
-                      <span className={`text-[12px] font-bold ${
-                        newCount > 0 
-                          ? 'text-emerald-700 font-extrabold' 
-                          : 'text-slate-600'
-                      }`}>
-                        {newCount > 0 ? `+${formatNumber(newCount)} ${unit}` : `0 ${unit}`}
-                      </span>
-                    </div>
-                  ) : (
-                    <span 
-                      className="text-[11px] font-semibold text-rose-600 bg-white/90 px-2 py-0.5 rounded border border-rose-200" 
-                      title={detail.error_message || 'Thất bại'}
-                    >
-                      {formatErrorMessage(detail.error_message)}
-                    </span>
-                  )}
-                </div>
-              );
-            })
-          ) : (
-            <div className="text-[12px] text-slate-500">Đã đồng bộ dữ liệu các chuỗi.</div>
+      {/* Row 2: Time ago, Date range, and single-chain status/error */}
+      <div className="flex items-center justify-between gap-2 mt-1 text-[11.5px] text-slate-400">
+        <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+          <span title={formatFullDate(item.created_at)}>
+            {formatTimeAgo(item.created_at)}
+          </span>
+          {item.start_date && (
+            <>
+              <span className="text-slate-300">•</span>
+              <span className="text-slate-500">
+                {formatDateShort(item.start_date)}
+                {item.end_date && item.end_date !== item.start_date ? ` → ${formatDateShort(item.end_date)}` : ''}
+              </span>
+            </>
           )}
         </div>
-      ) : (
-        /* Single Chain Body (No icons, clean simple stats) */
-        <div className="mt-2.5 pt-2.5 border-t border-slate-100">
-          {isSuccess ? (
-            <div className="flex items-center justify-between py-1.5 px-3 rounded-lg bg-slate-50/80 text-[12.5px]">
-              <span className="text-slate-600 font-medium">
-                Cập nhật thêm vào hệ thống:
+
+        {!isMultiChain && (
+          <div className="shrink-0 text-right">
+            {isSuccess ? (
+              <span className="text-[11px] font-medium text-emerald-600">Thành công</span>
+            ) : (
+              <span 
+                className="text-[11px] font-medium text-rose-600 truncate max-w-[180px] inline-block"
+                title={item.error_message || singleChainDetail?.error_message || ''}
+              >
+                {formatErrorMessage(item.error_message || singleChainDetail?.error_message)}
               </span>
-              <span className={`text-[12.5px] font-bold ${
-                totalNew > 0 ? 'text-emerald-700 font-extrabold' : 'text-slate-600'
-              }`}>
-                {totalNew > 0 ? `+${formatNumber(totalNew)}` : '0'} {unitLabel}
-              </span>
-            </div>
-          ) : (
-            <div className="py-2 px-3 rounded-lg bg-rose-50 border border-rose-100 text-[12px] text-rose-700 leading-relaxed">
-              <span className="font-bold text-rose-800">Không thể đồng bộ: </span>
-              {formatErrorMessage(item.error_message || singleChainDetail?.error_message)}
-            </div>
-          )}
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Multi-Chain Breakdown: Clean borderless rows, no nested cards */}
+      {isMultiChain && item.chain_details && item.chain_details.length > 0 && (
+        <div className="mt-2 pt-2 border-t border-slate-100 space-y-1">
+          {item.chain_details.map((detail, idx) => {
+            const chainItemName = detail.chain;
+            const unit = getChainUnit(chainItemName);
+            const isOk = detail.status === 'SUCCESS';
+            const newCount = detail.new_records || 0;
+
+            return (
+              <div 
+                key={idx}
+                className="flex items-center justify-between text-[12px] py-0.5 text-slate-600"
+              >
+                <span className="font-medium text-slate-700">
+                  {chainItemName}
+                </span>
+
+                {isOk ? (
+                  <span className={`font-bold ${
+                    newCount > 0 ? 'text-emerald-700 font-extrabold' : 'text-slate-500'
+                  }`}>
+                    {newCount > 0 ? `+${formatNumber(newCount)} ${unit}` : `0 ${unit}`}
+                  </span>
+                ) : (
+                  <span 
+                    className="text-[11px] font-semibold text-rose-600" 
+                    title={detail.error_message || 'Thất bại'}
+                  >
+                    {formatErrorMessage(detail.error_message)}
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

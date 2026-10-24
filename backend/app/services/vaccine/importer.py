@@ -38,13 +38,12 @@ PREFERRED_SHEET_NAME = "SHEET 1"
 
 
 def build_dedup_key(chain: str, ticket_id: Optional[str], error_type: Optional[str],
-                    error_description: Optional[str], employee: Optional[str] = None,
-                    summary: Optional[str] = None) -> str:
+                    error_description: Optional[str], employee: Optional[str] = None) -> str:
     """Identity of one Vaccine violation.
 
-    Keying on chain + ticket_id + error_type + error_description + employee + summary.
-    This ensures that multiple employees penalised on the same ticket or differing
-    summaries (e.g. Phạt vs Không phạt) are not incorrectly dropped as duplicates.
+    Keying on chain + ticket_id + error_type + error_description + employee.
+    This ensures that multiple employees penalised on the same ticket are not
+    incorrectly dropped as duplicates.
     Values are NFC-normalized and whitespace-collapsed only for hashing; the
     stored values remain verbatim.
     """
@@ -57,7 +56,6 @@ def build_dedup_key(chain: str, ticket_id: Optional[str], error_type: Optional[s
         norm(error_type),
         norm(error_description),
         norm(employee),
-        norm(summary),
     ])
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
@@ -158,7 +156,6 @@ class VaccineExcelImporter:
                 mapped.error_type,
                 mapped.error_description,
                 mapped.employee_raw,
-                mapped.summary,
             )
             arow = AnalyzedRow(mapped=mapped, validation=validation, dedup_key=key)
 

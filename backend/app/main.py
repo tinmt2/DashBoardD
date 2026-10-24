@@ -1,11 +1,15 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.services.fpt_shop.browser_session import FPTBrowserSession
+from app.services.scheduler.auto_sync_service import AutoSyncService
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    auto_sync = AutoSyncService.get_instance()
+    auto_sync.start()
     yield
     # Cleanup on shutdown
+    auto_sync.stop()
     session = FPTBrowserSession.get_instance()
     session.stop()
 
@@ -32,7 +36,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from app.api import health, fpt_shop, long_chau, long_chau_dashboard, vaccine, vaccine_dashboard, notifications, admin, employees
+from app.api import health, fpt_shop, long_chau, long_chau_dashboard, vaccine, vaccine_dashboard, notifications, admin, employees, auto_sync
 
 app.include_router(health.router, prefix="/api")
 app.include_router(admin.router, prefix="/api/admin")
@@ -43,6 +47,7 @@ app.include_router(long_chau_dashboard.router, prefix="/api")
 app.include_router(vaccine.router, prefix="/api/vaccine")
 app.include_router(vaccine_dashboard.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api/notifications")
+app.include_router(auto_sync.router, prefix="/api/auto-sync")
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse

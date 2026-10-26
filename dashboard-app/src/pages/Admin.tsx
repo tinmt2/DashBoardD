@@ -911,27 +911,11 @@ const Admin: React.FC = () => {
         {/* ======================================================== */}
         {activeTab === 'totp' && (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
-              <div>
-                <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                  <KeyRound size={16} className="text-indigo-400" />
-                  Cấu hình Authenticator Secret Key (Đăng nhập tự động 100%)
-                </h2>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Dùng chung 1 Secret Key cho cả 3 chuỗi: <span className="text-slate-300 font-semibold">FPT Shop</span>, <span className="text-slate-300 font-semibold">Long Châu</span> và <span className="text-slate-300 font-semibold">Vaccine</span>.
-                </p>
-              </div>
-
-              {hasTotpSecret ? (
-                <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 self-start sm:self-auto flex items-center gap-1.5">
-                  <Check size={12} />
-                  • Đã kích hoạt 2FA tự động
-                </span>
-              ) : (
-                <span className="px-2.5 py-0.5 rounded text-[11px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 self-start sm:self-auto">
-                  Chưa cài Secret Key
-                </span>
-              )}
+            <div className="border-b border-slate-800 pb-3">
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <KeyRound size={16} className="text-indigo-400" />
+                Cấu hình Authenticator Secret Key
+              </h2>
             </div>
 
             {/* Notification Feedback */}
@@ -946,71 +930,49 @@ const Admin: React.FC = () => {
             )}
 
             {/* Live OTP Preview Card */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 bg-slate-950 border border-slate-800/90 rounded-xl space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                    Mã xác thực TOTP hiện tại
-                  </span>
-                  <div className="flex items-center gap-1">
-                    {currentTotpCode && (
-                      <button
-                        type="button"
-                        onClick={handleCopyTotp}
-                        className={`p-1.5 rounded transition-all ${
-                          copiedTotp 
-                            ? 'text-emerald-400 bg-emerald-500/10' 
-                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-                        }`}
-                        title={copiedTotp ? "Đã chép vào clipboard" : "Sao chép mã TOTP"}
-                      >
-                        {copiedTotp ? <Check size={14} /> : <Copy size={14} />}
-                      </button>
-                    )}
+            <div className="p-4 bg-slate-950 border border-slate-800/90 rounded-xl space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                  Mã xác thực TOTP hiện tại
+                </span>
+                <div className="flex items-center gap-1">
+                  {currentTotpCode && (
                     <button
                       type="button"
-                      onClick={fetchTotpConfig}
-                      className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors"
-                      title="Làm mới mã"
+                      onClick={handleCopyTotp}
+                      className={`p-1.5 rounded transition-all ${
+                        copiedTotp 
+                          ? 'text-emerald-400 bg-emerald-500/10' 
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                      }`}
+                      title={copiedTotp ? "Đã chép vào clipboard" : "Sao chép mã TOTP"}
                     >
-                      <RefreshCw size={14} />
+                      {copiedTotp ? <Check size={14} /> : <Copy size={14} />}
                     </button>
-                  </div>
-                </div>
-
-                <div className="flex items-baseline gap-3">
-                  <div className="text-3xl font-extrabold tracking-widest font-mono text-indigo-400 bg-indigo-950/40 px-3 py-1.5 rounded-lg border border-indigo-800/40 inline-block">
-                    {currentTotpCode || '------'}
-                  </div>
-                  {currentTotpCode && (
-                    <div className="text-xs text-slate-400 flex items-center gap-1.5">
-                      <span>Đổi sau:</span>
-                      <span className={`font-mono font-bold ${totpCountdown <= 5 ? 'text-rose-400 animate-pulse' : 'text-emerald-400'}`}>
-                        {totpCountdown}s
-                      </span>
-                    </div>
                   )}
+                  <button
+                    type="button"
+                    onClick={fetchTotpConfig}
+                    className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors"
+                    title="Làm mới mã"
+                  >
+                    <RefreshCw size={14} />
+                  </button>
                 </div>
               </div>
 
-              <div className="p-4 bg-slate-950 border border-slate-800/90 rounded-xl space-y-3">
-                <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
-                  Trạng thái tự động áp dụng
-                </span>
-                <div className="space-y-2 text-xs text-slate-400">
-                  <div className="flex items-center justify-between py-1 border-b border-slate-900">
-                    <span className="text-slate-300">FPT Shop (CallLog)</span>
-                    <span className="text-emerald-400 font-semibold">Tự điền OTP + Submit</span>
-                  </div>
-                  <div className="flex items-center justify-between py-1 border-b border-slate-900">
-                    <span className="text-slate-300">Long Châu (Budibase SSO)</span>
-                    <span className="text-emerald-400 font-semibold">Tự điền OTP + Submit</span>
-                  </div>
-                  <div className="flex items-center justify-between py-1">
-                    <span className="text-slate-300">Vaccine (PTT Public SSO)</span>
-                    <span className="text-emerald-400 font-semibold">Tự điền OTP + Submit</span>
-                  </div>
+              <div className="flex items-baseline gap-3">
+                <div className="text-3xl font-extrabold tracking-widest font-mono text-indigo-400 bg-indigo-950/40 px-3 py-1.5 rounded-lg border border-indigo-800/40 inline-block">
+                  {currentTotpCode || '------'}
                 </div>
+                {currentTotpCode && (
+                  <div className="text-xs text-slate-400 flex items-center gap-1.5">
+                    <span>Đổi sau:</span>
+                    <span className={`font-mono font-bold ${totpCountdown <= 5 ? 'text-rose-400 animate-pulse' : 'text-emerald-400'}`}>
+                      {totpCountdown}s
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1036,16 +998,6 @@ const Admin: React.FC = () => {
                   {showTotpSecret ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
-
-              {maskedTotpSecret && (
-                <div className="text-[11px] text-slate-400">
-                  Khóa hiện tại đang lưu: <span className="font-mono text-slate-300">{maskedTotpSecret}</span>
-                </div>
-              )}
-
-              <p className="text-[11px] text-slate-500 leading-relaxed">
-                * Chuỗi Secret Key thường gồm các ký tự Base32 (A-Z và 2-7). Bạn có thể xóa khoảng trắng hoặc để nguyên, hệ thống sẽ tự làm sạch chuỗi.
-              </p>
 
               <div className="flex items-center gap-2 pt-2">
                 <button

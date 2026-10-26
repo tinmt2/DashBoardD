@@ -23,8 +23,8 @@ CONFIG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..",
 CONFIG_FILE = os.path.join(CONFIG_DIR, "auto_sync_config.json")
 
 DEFAULT_CONFIG: Dict[str, Any] = {
-    "enabled": False,
-    "interval_minutes": 60,
+    "enabled": True,
+    "interval_minutes": 15,
     "sync_chains": ["fpt_shop", "long_chau", "vaccine"],
     "date_range_days": 30,
     "last_run_at": None,

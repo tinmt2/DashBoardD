@@ -104,8 +104,8 @@ const Admin: React.FC = () => {
     sync_chains: string[];
     date_range_days: number;
   }>({
-    enabled: false,
-    interval_minutes: 60,
+    enabled: true,
+    interval_minutes: 15,
     sync_chains: ['fpt_shop', 'long_chau', 'vaccine'],
     date_range_days: 30,
   });
@@ -241,7 +241,7 @@ const Admin: React.FC = () => {
   useEffect(() => {
     if (!token) return;
     fetchAutoSync();
-  }, [token]);
+  }, [token, activeTab]);
 
   // Fetch TOTP Config
   const fetchTotpConfig = async () => {

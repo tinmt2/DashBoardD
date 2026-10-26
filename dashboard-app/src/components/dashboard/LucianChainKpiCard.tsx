@@ -6,38 +6,15 @@ import { useNavigate } from 'react-router-dom';
 import { 
   ArrowRight, ChevronDown, AlertCircle
 } from 'lucide-react';
-// ── Lucian #098 Rolling Digits Component ──
-export const LucianRollingDigits: React.FC<{ value: number; className?: string }> = ({ value, className = '' }) => {
-  const formatted = useMemo(() => Math.max(0, Math.round(value)).toLocaleString('vi-VN'), [value]);
-  const chars = formatted.split('');
+import { AnimatedNumber } from '../common/AnimatedNumber';
 
+// ── Lucian Rolling Digits Component (Powered by Smooth AnimatedNumber) ──
+export const LucianRollingDigits: React.FC<{ value: number; className?: string }> = ({ value, className = '' }) => {
+  const safeVal = typeof value === 'number' && !isNaN(value) ? Math.max(0, Math.round(value)) : 0;
   return (
-    <div className={`lucian-rolling-digits ${className}`} role="img" aria-label={`Số lượng: ${formatted}`}>
-      {chars.map((ch, idx) => {
-        const isDigit = /\d/.test(ch);
-        if (!isDigit) {
-          return (
-            <span key={idx} className="lucian-sym">
-              {ch}
-            </span>
-          );
-        }
-        const digitVal = parseInt(ch, 10);
-        return (
-          <span 
-            key={idx} 
-            className="lucian-col" 
-            style={{ '--d': digitVal, '--i': idx } as React.CSSProperties}
-          >
-            <span className="lucian-col-inner">
-              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
-                <span key={n}>{n}</span>
-              ))}
-            </span>
-          </span>
-        );
-      })}
-    </div>
+    <span className={`lucian-rolling-digits ${className}`}>
+      <AnimatedNumber value={safeVal} />
+    </span>
   );
 };
 

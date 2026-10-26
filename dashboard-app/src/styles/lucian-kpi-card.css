@@ -297,11 +297,9 @@
 @media (prefers-reduced-motion: reduce) {
   .lucian-kpi-inner,
   .lucian-building-img,
-  .lucian-col-inner,
   .lucian-cta-btn,
   .lucian-progress-fill {
     transition: none !important;
     animation: none !important;
-    transform: none !important;
   }
 }

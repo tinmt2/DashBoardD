@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+// Lucian UX/UI Prompt #039 Sliding Pill Tabs · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#039
+// Streamlined & Clean Admin Dashboard for DashBoardD
+
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Shield, Server, Cpu, Database, RefreshCw, Key, LogOut, 
-  AlertTriangle, Clock, Activity, ArrowLeft, 
-  Eye, EyeOff, Lock, User, HardDrive, Wifi, Store, Pill, 
-  ShieldPlus, Bell, CheckCircle2, Terminal, Play, Trash2, Download, Search, AlertCircle, XCircle,
-  Calendar, Layers, Save, Check, Loader2
+  Eye, EyeOff, Loader2
 } from 'lucide-react';
 import { 
   getAutoSyncConfig, 
@@ -59,6 +58,8 @@ interface SystemOverview {
   checked_at: string;
 }
 
+type AdminTab = 'system' | 'autosync' | 'logs' | 'audit';
+
 const Admin: React.FC = () => {
   const navigate = useNavigate();
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('admin_token'));
@@ -67,6 +68,9 @@ const Admin: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  // Active Tab state (Lucian #039 Sliding Pill Tabs)
+  const [activeTab, setActiveTab] = useState<AdminTab>('system');
 
   // Overview data
   const [overview, setOverview] = useState<SystemOverview | null>(null);
@@ -90,7 +94,7 @@ const Admin: React.FC = () => {
   const [autoScrollLogs, setAutoScrollLogs] = useState(true);
   const [isTestingSync, setIsTestingSync] = useState(false);
   const [testSyncResult, setTestSyncResult] = useState<{ success: boolean; message: string } | null>(null);
-  const logContainerRef = React.useRef<HTMLDivElement>(null);
+  const logContainerRef = useRef<HTMLDivElement>(null);
 
   // Auto-Sync Scheduler State
   const [autoSyncConfig, setAutoSyncConfig] = useState<AutoSyncConfig | null>(null);
@@ -238,8 +242,8 @@ const Admin: React.FC = () => {
       setAutoSyncFeedback({
         type: 'success',
         message: autoSyncForm.enabled
-          ? `Đã lưu lịch trình! Máy chủ sẽ tự động quét mỗi ${autoSyncForm.interval_minutes} phút.`
-          : 'Đã lưu cấu hình! Đã tắt lịch tự động đồng bộ ngầm.',
+          ? `Đã lưu! Quét tự động mỗi ${autoSyncForm.interval_minutes} phút.`
+          : 'Đã lưu! Đã tắt quét tự động ngầm.',
       });
       setTimeout(() => setAutoSyncFeedback(null), 4000);
     } catch (err: any) {
@@ -259,7 +263,7 @@ const Admin: React.FC = () => {
       const res = await triggerAutoSyncRunNow();
       setAutoSyncFeedback({
         type: 'success',
-        message: res.message || 'Đã kích hoạt đồng bộ ngầm ngay bây giờ! Kiểm tra log bên dưới.',
+        message: res.message || 'Đã kích hoạt quét ngầm ngay bây giờ! Chuyển sang tab Nhật ký Log để xem.',
       });
       setTimeout(async () => {
         await fetchLogs();
@@ -391,987 +395,819 @@ const Admin: React.FC = () => {
   // === RENDER: LOGIN FORM ===
   if (!token) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden font-sans">
-        {/* Background glow effects */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/15 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="w-full max-w-md relative z-10">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 font-sans text-slate-100">
+        <div className="w-full max-w-sm">
           <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center p-3 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl mb-3">
-              <BrandLogo size={42} />
+            <div className="inline-flex items-center justify-center mb-2">
+              <BrandLogo size={40} />
             </div>
-            <h1 className="text-2xl font-black text-white tracking-tight">Trung Tâm Quản Trị</h1>
-            <p className="text-sm text-slate-400 mt-1">Đăng nhập tài khoản Admin để theo dõi hệ thống DashBoardD</p>
+            <h1 className="text-xl font-bold text-white tracking-tight">Quản trị hệ thống</h1>
+            <p className="text-xs text-slate-400 mt-1">Đăng nhập tài khoản Admin để truy cập máy chủ</p>
           </div>
 
-          <GlassCard className="p-7 backdrop-blur-2xl bg-slate-800/80 border border-slate-700/80 shadow-2xl rounded-2xl">
+          <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl shadow-xl">
             <form onSubmit={handleLogin} className="space-y-4">
               {loginError && (
-                <div className="p-3 bg-rose-500/20 border border-rose-500/40 rounded-xl text-rose-300 text-xs font-semibold flex items-center gap-2">
-                  <AlertTriangle size={16} className="shrink-0 text-rose-400" />
-                  <span>{loginError}</span>
+                <div className="p-2.5 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-300 text-xs font-medium">
+                  {loginError}
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                  Tài khoản Admin
+                <label className="block text-xs font-semibold text-slate-400 mb-1">
+                  Tài khoản
                 </label>
-                <div className="relative flex items-center">
-                  <User size={17} className="absolute left-3 text-slate-400" />
-                  <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2.5 bg-slate-900/80 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 transition-colors"
-                    placeholder="Tên đăng nhập (admin)"
-                    required
-                  />
-                </div>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 transition-colors"
+                  placeholder="admin"
+                  required
+                />
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                <label className="block text-xs font-semibold text-slate-400 mb-1">
                   Mật khẩu
                 </label>
                 <div className="relative flex items-center">
-                  <Lock size={17} className="absolute left-3 text-slate-400" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-9 pr-10 py-2.5 bg-slate-900/80 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 transition-colors"
-                    placeholder="Nhập mật khẩu Admin"
+                    className="w-full pl-3 pr-9 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 transition-colors"
+                    placeholder="Nhập mật khẩu"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 text-slate-400 hover:text-slate-200 transition-colors"
+                    className="absolute right-2.5 text-slate-500 hover:text-slate-300 transition-colors text-xs"
                   >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
-                <div className="mt-2 text-[11px] text-slate-500 flex items-center justify-between">
-                  <span>Mật khẩu mặc định: <strong className="text-slate-400 font-mono">admin@123</strong></span>
+                <div className="mt-1.5 text-[11px] text-slate-500">
+                  Mặc định: <span className="text-slate-400 font-mono">admin@123</span>
                 </div>
               </div>
 
               <button
                 type="submit"
                 disabled={isLoggingIn}
-                className="w-full mt-2 py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
+                className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl transition-all cursor-pointer disabled:opacity-50"
               >
-                {isLoggingIn ? (
-                  <RefreshCw size={17} className="animate-spin" />
-                ) : (
-                  <Shield size={17} />
-                )}
-                {isLoggingIn ? 'Đang xác thực...' : 'Đăng nhập Quản Trị'}
+                {isLoggingIn ? 'Đang xác thực...' : 'Đăng nhập'}
               </button>
 
-              <div className="pt-2 text-center border-t border-slate-700/60 mt-4">
+              <div className="pt-2 text-center border-t border-slate-800 mt-4">
                 <button
                   type="button"
                   onClick={() => navigate('/dashboard')}
-                  className="text-xs text-slate-400 hover:text-white transition-colors inline-flex items-center gap-1.5"
+                  className="text-xs text-slate-400 hover:text-white transition-colors"
                 >
-                  <ArrowLeft size={14} /> Quay lại trang Dashboard chính
+                  ← Quay lại trang Tổng quan
                 </button>
               </div>
             </form>
-          </GlassCard>
+          </div>
         </div>
       </div>
     );
   }
 
-  // === RENDER: ADMIN DASHBOARD MONITOR ===
+  // === RENDER: STREAMLINED ADMIN DASHBOARD ===
   const sys = overview?.system;
   const db = overview?.database;
   const chains = overview?.chains;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4 sm:p-6 lg:p-8 relative">
-      {/* Dynamic Background Glow */}
-      <div className="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden z-0">
-        <div className="absolute top-10 left-1/3 w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-[120px]" />
-        <div className="absolute bottom-10 right-1/4 w-[400px] h-[400px] bg-indigo-600/10 rounded-full blur-[100px]" />
-      </div>
-
-      <div className="max-w-7xl mx-auto relative z-10 space-y-6">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4 sm:p-6 lg:p-8">
+      <div className="max-w-6xl mx-auto space-y-5">
         
-        {/* === TOP ADMIN HEADER === */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-4 sm:p-5 rounded-2xl shadow-xl">
+        {/* === TOP ADMIN HEADER (Minimal & Clean) === */}
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-2xl">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl shadow-lg shadow-indigo-500/20 text-white">
-              <Shield size={24} />
-            </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-black text-white tracking-tight">Khu Vực Quản Trị Hệ Thống</h1>
-                <span className="px-2 py-0.5 text-[11px] font-extrabold uppercase rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Root Admin
+                <h1 className="text-lg font-bold text-white tracking-tight">Quản trị hệ thống</h1>
+                <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  Root Admin
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">Giám sát máy chủ nội bộ, tiến trình đồng bộ dữ liệu và bảo mật</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Trạng thái: <span className="font-semibold text-emerald-400">{sys?.status || 'ONLINE'}</span> (Port {sys?.port || 8000}) · Chạy: <span className="text-slate-300 font-mono">{sys?.uptime_str || '0s'}</span>
+              </p>
             </div>
           </div>
 
+          {/* Action Links & Buttons without icons */}
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setAutoRefresh(!autoRefresh)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
                 autoRefresh 
-                  ? 'bg-indigo-600/20 border-indigo-500/40 text-indigo-300' 
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' 
                   : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
               }`}
-              title="Tự động cập nhật mỗi 5 giây"
             >
-              <RefreshCw size={14} className={autoRefresh ? "animate-spin" : ""} />
-              {autoRefresh ? "Live 5s" : "Tạm dừng"}
+              {autoRefresh ? "• Live 5s" : "Tạm dừng"}
             </button>
 
             <button
               onClick={fetchOverview}
               disabled={isLoadingOverview}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold border border-slate-700 transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium border border-slate-700 transition-colors"
             >
-              <RefreshCw size={14} className={isLoadingOverview ? "animate-spin" : ""} /> Làm mới
+              {isLoadingOverview ? "Đang tải..." : "Làm mới"}
             </button>
 
             <button
               onClick={() => setIsChangePwOpen(true)}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold border border-slate-700 transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium border border-slate-700 transition-colors"
             >
-              <Key size={14} /> Đổi mật khẩu
+              Đổi mật khẩu
             </button>
 
             <button
               onClick={() => navigate('/dashboard')}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold border border-slate-700 transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium border border-slate-700 transition-colors"
             >
-              <ArrowLeft size={14} /> Xem Dashboard
+              ← Xem Dashboard
             </button>
 
             <button
               onClick={handleLogout}
-              className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 rounded-xl text-xs font-semibold border border-rose-500/30 transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 rounded-lg text-xs font-medium border border-rose-500/20 transition-colors"
             >
-              <LogOut size={14} /> Đăng xuất
+              Đăng xuất
             </button>
           </div>
         </header>
 
-        {/* === SECTION 1: SERVER & HARDWARE METRICS === */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          
-          {/* Card 1: Server Status */}
-          <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4.5 backdrop-blur-xl">
-            <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider">Trạng Thái Server</span>
-              <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl">
-                <Server size={18} />
-              </div>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-black text-white">{sys?.status || 'ONLINE'}</span>
-              <span className="text-xs font-medium text-emerald-400 font-mono">Port {sys?.port || 8000}</span>
-            </div>
-            <div className="mt-2 text-[12px] text-slate-400 flex items-center gap-1.5">
-              <Clock size={13} className="text-slate-500" />
-              <span>Thời gian chạy: <strong className="text-slate-300 font-mono">{sys?.uptime_str || '0s'}</strong></span>
-            </div>
-          </div>
+        {/* === LUCIAN #039 SLIDING PILL TABS === */}
+        <div className="flex items-center justify-start border-b border-slate-800 pb-3 gap-2 overflow-x-auto">
+          <button
+            type="button"
+            onClick={() => setActiveTab('system')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'system'
+                ? 'bg-white text-slate-950 shadow-sm'
+                : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 border border-slate-800/60'
+            }`}
+          >
+            Hệ thống & Kết nối
+          </button>
 
-          {/* Card 2: CPU Usage */}
-          <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4.5 backdrop-blur-xl">
-            <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider">Sử Dụng CPU</span>
-              <div className="p-2 bg-blue-500/10 text-blue-400 rounded-xl">
-                <Cpu size={18} />
-              </div>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-black text-white font-mono">{sys?.cpu_percent ?? 0}%</span>
-              <span className="text-xs text-slate-400">Máy trạm nội bộ</span>
-            </div>
-            <div className="w-full bg-slate-800 rounded-full h-1.5 mt-3 overflow-hidden">
-              <div 
-                className={`h-full rounded-full transition-all duration-500 ${
-                  (sys?.cpu_percent ?? 0) > 80 ? 'bg-rose-500' : (sys?.cpu_percent ?? 0) > 50 ? 'bg-amber-500' : 'bg-blue-500'
-                }`}
-                style={{ width: `${Math.min(sys?.cpu_percent ?? 0, 100)}%` }}
-              />
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={() => setActiveTab('autosync')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              activeTab === 'autosync'
+                ? 'bg-white text-slate-950 shadow-sm'
+                : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 border border-slate-800/60'
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${autoSyncConfig?.enabled ? 'bg-emerald-500' : 'bg-slate-600'}`} />
+            Tự động đồng bộ
+          </button>
 
-          {/* Card 3: RAM Usage */}
-          <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4.5 backdrop-blur-xl">
-            <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider">Bộ Nhớ RAM</span>
-              <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-xl">
-                <HardDrive size={18} />
-              </div>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-black text-white font-mono">{sys?.ram_percent ?? 0}%</span>
-              <span className="text-xs text-slate-400 font-mono">({sys?.ram_used_gb} / {sys?.ram_total_gb} GB)</span>
-            </div>
-            <div className="w-full bg-slate-800 rounded-full h-1.5 mt-3 overflow-hidden">
-              <div 
-                className={`h-full rounded-full transition-all duration-500 ${
-                  (sys?.ram_percent ?? 0) > 85 ? 'bg-rose-500' : (sys?.ram_percent ?? 0) > 70 ? 'bg-amber-500' : 'bg-indigo-500'
-                }`}
-                style={{ width: `${Math.min(sys?.ram_percent ?? 0, 100)}%` }}
-              />
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={() => setActiveTab('logs')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              activeTab === 'logs'
+                ? 'bg-white text-slate-950 shadow-sm'
+                : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 border border-slate-800/60'
+            }`}
+          >
+            Nhật ký Log ({logs.length})
+          </button>
 
-          {/* Card 4: Database Storage */}
-          <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4.5 backdrop-blur-xl">
-            <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider">Cơ Sở Dữ Liệu SQLite</span>
-              <div className="p-2 bg-amber-500/10 text-amber-400 rounded-xl">
-                <Database size={18} />
-              </div>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-black text-white font-mono">{db?.db_size_mb ?? 0} MB</span>
-              <span className="text-xs text-emerald-400 font-bold">{db?.total_tickets.toLocaleString() ?? 0} tickets</span>
-            </div>
-            <div className="mt-2 text-[12px] text-slate-400 flex items-center justify-between">
-              <span>Đang lưu tại:</span>
-              <span className="text-slate-300 font-mono text-[11px]">opsmonitor.db</span>
-            </div>
-          </div>
-
+          <button
+            type="button"
+            onClick={() => setActiveTab('audit')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'audit'
+                ? 'bg-white text-slate-950 shadow-sm'
+                : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 border border-slate-800/60'
+            }`}
+          >
+            Thông báo & Mạng
+          </button>
         </div>
 
-        {/* === SECTION 2: 3 CHAINS CONNECTION STATUS === */}
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 backdrop-blur-xl">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Wifi size={18} className="text-indigo-400" />
-              <h2 className="text-base font-bold text-white">Trạng Thái Kết Nối 3 Chuỗi (Selenium & Budibase)</h2>
+        {/* ======================================================== */}
+        {/* TAB 1: HỆ THỐNG & KẾT NỐI (Streamlined Metrics) */}
+        {/* ======================================================== */}
+        {activeTab === 'system' && (
+          <div className="space-y-4">
+            {/* Server & Hardware Summary */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+              
+              {/* Server Status */}
+              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Máy chủ</span>
+                <div className="text-xl font-bold text-white flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                  {sys?.status || 'ONLINE'}
+                </div>
+                <div className="mt-2 text-[11px] text-slate-400">
+                  Cổng: <span className="font-mono text-slate-200 font-bold">{sys?.port || 8000}</span>
+                </div>
+              </div>
+
+              {/* CPU */}
+              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">CPU</span>
+                <div className="text-xl font-bold text-white font-mono">{sys?.cpu_percent ?? 0}%</div>
+                <div className="w-full bg-slate-800 rounded-full h-1 mt-2.5 overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full ${
+                      (sys?.cpu_percent ?? 0) > 80 ? 'bg-rose-500' : 'bg-indigo-500'
+                    }`}
+                    style={{ width: `${Math.min(sys?.cpu_percent ?? 0, 100)}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* RAM */}
+              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Bộ nhớ RAM</span>
+                <div className="text-xl font-bold text-white font-mono">{sys?.ram_percent ?? 0}%</div>
+                <div className="mt-1 text-[11px] text-slate-400 font-mono">
+                  {sys?.ram_used_gb} / {sys?.ram_total_gb} GB
+                </div>
+              </div>
+
+              {/* Database */}
+              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Cơ sở dữ liệu SQLite</span>
+                <div className="text-xl font-bold text-white font-mono">{db?.db_size_mb ?? 0} MB</div>
+                <div className="mt-1 text-[11px] text-emerald-400 font-bold">
+                  {db?.total_tickets.toLocaleString() ?? 0} dòng dữ liệu
+                </div>
+              </div>
+
             </div>
-            <span className="text-xs text-slate-400">Kiểm tra phiên đăng nhập tự động</span>
+
+            {/* 3 Chains Status (Clean Flat Table-like Cards) */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+              <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800/80">
+                <h2 className="text-sm font-bold text-white">Trạng thái kết nối 3 chuỗi</h2>
+                <span className="text-xs text-slate-400">Tự động kiểm tra phiên làm việc</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {/* FPT Shop */}
+                <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-sm text-white">FPT Shop</span>
+                    {chains?.fpt_shop.authenticated ? (
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        Đã xác thực
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                        {chains?.fpt_shop.status || 'Chưa kết nối'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-400 space-y-1">
+                    <div className="flex justify-between">
+                      <span>Cơ chế:</span>
+                      <span className="text-slate-300">Chrome Headless</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Dữ liệu:</span>
+                      <span className="font-bold text-rose-400 font-mono">{db?.fpt_tickets.toLocaleString() ?? 0} dòng</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Long Châu */}
+                <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-sm text-white">Long Châu</span>
+                    {chains?.long_chau.authenticated ? (
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        Đã xác thực
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                        {chains?.long_chau.status || 'Chưa kết nối'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-400 space-y-1">
+                    <div className="flex justify-between">
+                      <span>Cơ chế:</span>
+                      <span className="text-slate-300">Budibase Session</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Dữ liệu:</span>
+                      <span className="font-bold text-blue-400 font-mono">{db?.long_chau_tickets.toLocaleString() ?? 0} dòng</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Vaccine */}
+                <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-sm text-white">Vaccine</span>
+                    {chains?.vaccine.authenticated ? (
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        Đã xác thực
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                        {chains?.vaccine.status || 'Chưa kết nối'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-400 space-y-1">
+                    <div className="flex justify-between">
+                      <span>Cơ chế:</span>
+                      <span className="text-slate-300">PTT Public</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Dữ liệu:</span>
+                      <span className="font-bold text-teal-400 font-mono">{db?.vaccine_tickets.toLocaleString() ?? 0} dòng</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
+        )}
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            
-            {/* Chain 1: FPT Shop */}
-            <div className="p-4 bg-slate-950/70 border border-slate-800/90 rounded-xl relative overflow-hidden">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-rose-500/10 text-rose-400 rounded-lg">
-                    <Store size={18} />
-                  </div>
-                  <span className="font-bold text-sm text-white">FPT Shop</span>
-                </div>
-                {chains?.fpt_shop.authenticated ? (
-                  <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                    <CheckCircle2 size={12} /> Connected
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-1">
-                    <Clock size={12} /> {chains?.fpt_shop.status || 'Chưa kết nối'}
-                  </span>
-                )}
+        {/* ======================================================== */}
+        {/* TAB 2: TỰ ĐỘNG ĐỒNG BỘ (Clean Auto-Sync Scheduler) */}
+        {/* ======================================================== */}
+        {activeTab === 'autosync' && (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+              <div>
+                <h2 className="text-sm font-bold text-white">Cấu hình tiến trình tự động quét dữ liệu</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Hệ thống sẽ chạy ngầm định kỳ để cập nhật số calllog và ticket mới</p>
               </div>
-              <div className="mt-3 text-xs text-slate-400 space-y-1">
-                <div className="flex justify-between">
-                  <span>Trình duyệt:</span>
-                  <span className="font-mono text-slate-300">Chrome Headless</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Dữ liệu đã nạp:</span>
-                  <span className="font-bold text-rose-400 font-mono">{db?.fpt_tickets.toLocaleString() ?? 0} dòng</span>
-                </div>
-              </div>
+
+              {autoSyncConfig?.enabled ? (
+                <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 self-start sm:self-auto">
+                  • Đang bật
+                </span>
+              ) : (
+                <span className="px-2.5 py-0.5 rounded text-[11px] font-semibold bg-slate-800 text-slate-400 self-start sm:self-auto">
+                  Đang tắt
+                </span>
+              )}
             </div>
 
-            {/* Chain 2: Long Châu */}
-            <div className="p-4 bg-slate-950/70 border border-slate-800/90 rounded-xl relative overflow-hidden">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-blue-500/10 text-blue-400 rounded-lg">
-                    <Pill size={18} />
-                  </div>
-                  <span className="font-bold text-sm text-white">Long Châu</span>
-                </div>
-                {chains?.long_chau.authenticated ? (
-                  <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                    <CheckCircle2 size={12} /> Connected
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-1">
-                    <Clock size={12} /> {chains?.long_chau.status || 'Chưa kết nối'}
-                  </span>
-                )}
+            {/* Feedback Alert */}
+            {autoSyncFeedback && (
+              <div className={`p-3 rounded-xl text-xs font-medium border ${
+                autoSyncFeedback.type === 'success' 
+                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' 
+                  : 'bg-rose-500/10 border-rose-500/20 text-rose-300'
+              }`}>
+                {autoSyncFeedback.message}
               </div>
-              <div className="mt-3 text-xs text-slate-400 space-y-1">
-                <div className="flex justify-between">
-                  <span>Cơ chế:</span>
-                  <span className="font-mono text-slate-300">Budibase API Session</span>
+            )}
+
+            {/* Inputs Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              
+              {/* Toggle Switch */}
+              <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl flex flex-col justify-between">
+                <div>
+                  <span className="text-xs font-bold text-slate-300 block mb-1">Trạng thái hoạt động</span>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Bật để server tự động quét định kỳ theo chu kỳ bên dưới.
+                  </p>
                 </div>
-                <div className="flex justify-between">
-                  <span>Dữ liệu đã nạp:</span>
-                  <span className="font-bold text-blue-400 font-mono">{db?.long_chau_tickets.toLocaleString() ?? 0} dòng</span>
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    onClick={() => setAutoSyncForm(prev => ({ ...prev, enabled: !prev.enabled }))}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      autoSyncForm.enabled 
+                        ? 'bg-emerald-600 text-white' 
+                        : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {autoSyncForm.enabled ? '✓ Đang kích hoạt' : 'Tắt quét ngầm'}
+                  </button>
                 </div>
               </div>
+
+              {/* Interval & Days */}
+              <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">
+                    Chu kỳ quét (phút)
+                  </label>
+                  <input
+                    type="number"
+                    min={15}
+                    max={1440}
+                    value={autoSyncForm.interval_minutes}
+                    onChange={(e) => setAutoSyncForm(prev => ({ ...prev, interval_minutes: Number(e.target.value) }))}
+                    className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white text-xs font-mono focus:outline-none focus:border-indigo-500"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-1 block">Khuyến nghị: 60 phút</span>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">
+                    Số ngày quét gần nhất
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={90}
+                    value={autoSyncForm.date_range_days}
+                    onChange={(e) => setAutoSyncForm(prev => ({ ...prev, date_range_days: Number(e.target.value) }))}
+                    className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white text-xs font-mono focus:outline-none focus:border-indigo-500"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-1 block">Mặc định: 30 ngày gần đây</span>
+                </div>
+              </div>
+
+              {/* Chain Selection */}
+              <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
+                <span className="text-xs font-bold text-slate-300 block mb-1">Chuỗi áp dụng quét ngầm</span>
+                {[
+                  { key: 'fpt_shop', label: 'FPT Shop' },
+                  { key: 'long_chau', label: 'Long Châu' },
+                  { key: 'vaccine', label: 'Vaccine' },
+                ].map(({ key, label }) => {
+                  const checked = autoSyncForm.sync_chains.includes(key);
+                  return (
+                    <label key={key} className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer py-1">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setAutoSyncForm(prev => ({ ...prev, sync_chains: [...prev.sync_chains, key] }));
+                          } else {
+                            setAutoSyncForm(prev => ({ ...prev, sync_chains: prev.sync_chains.filter(k => k !== key) }));
+                          }
+                        }}
+                        className="rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-0"
+                      />
+                      <span>{label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+
             </div>
 
-            {/* Chain 3: Vaccine */}
-            <div className="p-4 bg-slate-950/70 border border-slate-800/90 rounded-xl relative overflow-hidden">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-teal-500/10 text-teal-400 rounded-lg">
-                    <ShieldPlus size={18} />
-                  </div>
-                  <span className="font-bold text-sm text-white">Vaccine</span>
-                </div>
-                {chains?.vaccine.authenticated ? (
-                  <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                    <CheckCircle2 size={12} /> Connected
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-1">
-                    <Clock size={12} /> {chains?.vaccine.status || 'Chưa kết nối'}
-                  </span>
-                )}
-              </div>
-              <div className="mt-3 text-xs text-slate-400 space-y-1">
-                <div className="flex justify-between">
-                  <span>Cơ chế:</span>
-                  <span className="font-mono text-slate-300">PTT Public Datasource</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Dữ liệu đã nạp:</span>
-                  <span className="font-bold text-teal-400 font-mono">{db?.vaccine_tickets.toLocaleString() ?? 0} dòng</span>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-        {/* === SECTION 2.2: AUTO-SYNC SCHEDULE & DAEMON CONFIGURATION === */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 backdrop-blur-xl shadow-2xl space-y-5">
-          {/* Header & Status Indicator */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-xl flex items-center justify-center">
-                <Clock size={22} />
+            {/* Schedule Status Strip */}
+            <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div>
+                <span className="text-slate-400 block text-[11px]">Lần quét gần nhất:</span>
+                <span className="font-mono text-slate-200 font-bold">{formatScheduleTime(autoSyncConfig?.last_run_at)}</span>
               </div>
               <div>
-                <div className="flex items-center gap-2.5">
-                  <h2 className="text-base font-black text-white tracking-tight">
-                    Cấu Hình Lịch Tự Động Đồng Bộ Ngầm (Auto-Sync Daemon)
-                  </h2>
-                  {autoSyncConfig?.enabled ? (
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Đang Hoạt Động (Live)
-                    </span>
-                  ) : (
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-800 text-slate-400 border border-slate-700">
-                      Đang Tạm Dừng
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Máy chủ tự động quét và tải dữ liệu định kỳ từ FPT Shop, Long Châu và Vaccine không cần người dùng thao tác
-                </p>
+                <span className="text-slate-400 block text-[11px]">Lần quét kế tiếp:</span>
+                <span className="font-mono text-indigo-400 font-bold">
+                  {autoSyncForm.enabled ? formatScheduleTime(autoSyncConfig?.next_run_at) : 'Đang tạm dừng'}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[11px]">Kết quả:</span>
+                <span className="text-slate-300 truncate block" title={autoSyncConfig?.last_message || ''}>
+                  {autoSyncConfig?.last_message || 'Chưa có dữ liệu'}
+                </span>
               </div>
             </div>
 
-            {/* Top Quick Actions */}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleTriggerAutoSyncNow}
-                disabled={isTriggeringAutoSync || autoSyncConfig?.is_running}
-                className="px-3.5 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 font-bold text-xs rounded-xl border border-emerald-500/40 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
-                title="Bấm để kích hoạt tiến trình đồng bộ ngầm ngay bây giờ"
-              >
-                {isTriggeringAutoSync || autoSyncConfig?.is_running ? (
-                  <RefreshCw size={14} className="animate-spin" />
-                ) : (
-                  <Play size={14} fill="currentColor" />
-                )}
-                {isTriggeringAutoSync || autoSyncConfig?.is_running ? 'Đang Chạy Đồng Bộ...' : '⚡ Đồng Bộ Ngay'}
-              </button>
-
+            {/* Save & Run Action Buttons */}
+            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800">
               <button
                 type="button"
                 onClick={handleSaveAutoSync}
                 disabled={isSavingAutoSync}
-                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer disabled:opacity-50"
               >
-                {isSavingAutoSync ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
-                {isSavingAutoSync ? 'Đang Lưu...' : 'Lưu Cấu Hình'}
+                {isSavingAutoSync ? 'Đang lưu...' : 'Lưu cấu hình'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleTriggerAutoSyncNow}
+                disabled={isTriggeringAutoSync}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {isTriggeringAutoSync ? 'Đang kích hoạt...' : 'Chạy quét ngầm ngay'}
               </button>
             </div>
           </div>
+        )}
 
-          {/* Feedback banner */}
-          {autoSyncFeedback && (
-            <div className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-between gap-3 ${
-              autoSyncFeedback.type === 'success'
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
-            }`}>
-              <div className="flex items-center gap-2">
-                {autoSyncFeedback.type === 'success' ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
-                <span>{autoSyncFeedback.message}</span>
-              </div>
-              <button onClick={() => setAutoSyncFeedback(null)} className="text-slate-400 hover:text-white">✕</button>
-            </div>
-          )}
-
-          {/* Form Controls Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            
-            {/* Card 1: Master Enable / Disable Toggle */}
-            <div className="p-4 bg-slate-950/70 border border-slate-800/90 rounded-xl flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Trạng Thái Tiến Trình</span>
+        {/* ======================================================== */}
+        {/* TAB 3: NHẬT KÝ LOG (Clean Live Terminal) */}
+        {/* ======================================================== */}
+        {activeTab === 'logs' && (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3.5">
+            {/* Toolbar */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="text-slate-400 font-semibold mr-1">Bộ lọc:</span>
+                {(['ALL', 'ERROR', 'WARNING', 'INFO'] as const).map(lvl => (
                   <button
-                    type="button"
-                    role="switch"
-                    aria-checked={autoSyncForm.enabled}
-                    onClick={() => setAutoSyncForm(prev => ({ ...prev, enabled: !prev.enabled }))}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      autoSyncForm.enabled ? 'bg-indigo-600' : 'bg-slate-700'
+                    key={lvl}
+                    onClick={() => setLogLevelFilter(lvl)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                      logLevelFilter === lvl
+                        ? (lvl === 'ERROR' ? 'bg-rose-500 text-white' :
+                           lvl === 'WARNING' ? 'bg-amber-500 text-slate-950' :
+                           lvl === 'INFO' ? 'bg-blue-600 text-white' :
+                           'bg-white text-slate-950')
+                        : 'bg-slate-800 text-slate-400 hover:text-slate-200'
                     }`}
                   >
-                    <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                        autoSyncForm.enabled ? 'translate-x-5' : 'translate-x-0'
-                      }`}
-                    />
+                    {lvl === 'ALL' ? 'Tất cả' : lvl}
                   </button>
-                </div>
-                <div className="text-sm font-bold text-white">
-                  {autoSyncForm.enabled ? 'Bật Tự Động Định Kỳ' : 'Tắt Tự Động (Chỉ Thủ Công)'}
-                </div>
-                <p className="text-[11.5px] text-slate-400 mt-1 leading-relaxed">
-                  {autoSyncForm.enabled 
-                    ? 'Máy chủ chạy thread ngầm độc lập, tự động quét theo chu kỳ bên cạnh.' 
-                    : 'Máy chủ sẽ không tự động quét dữ liệu cho đến khi được bật lại.'}
-                </p>
-              </div>
-            </div>
-
-            {/* Card 2: Interval & Date Range */}
-            <div className="p-4 bg-slate-950/70 border border-slate-800/90 rounded-xl space-y-3">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1.5">
-                  <Clock size={13} className="text-indigo-400" /> Chu Kỳ Quét Định Kỳ
-                </label>
-                <select
-                  value={autoSyncForm.interval_minutes}
-                  onChange={e => setAutoSyncForm(prev => ({ ...prev, interval_minutes: Number(e.target.value) }))}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 text-white rounded-lg text-xs font-bold focus:outline-none focus:border-indigo-500 cursor-pointer"
-                >
-                  <option value={15}>Mỗi 15 phút</option>
-                  <option value={30}>Mỗi 30 phút</option>
-                  <option value={60}>Mỗi 1 giờ (Khuyên dùng)</option>
-                  <option value={120}>Mỗi 2 giờ</option>
-                  <option value={240}>Mỗi 4 giờ</option>
-                  <option value={720}>Mỗi 12 giờ</option>
-                  <option value={1440}>Mỗi 24 giờ (1 ngày/lần)</option>
-                </select>
+                ))}
               </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1.5">
-                  <Calendar size={13} className="text-indigo-400" /> Khoảng Thời Gian Dữ Liệu
-                </label>
-                <select
-                  value={autoSyncForm.date_range_days}
-                  onChange={e => setAutoSyncForm(prev => ({ ...prev, date_range_days: Number(e.target.value) }))}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 text-white rounded-lg text-xs font-bold focus:outline-none focus:border-indigo-500 cursor-pointer"
-                >
-                  <option value={7}>7 ngày gần nhất</option>
-                  <option value={14}>14 ngày gần nhất</option>
-                  <option value={30}>30 ngày gần nhất (Tiêu chuẩn)</option>
-                  <option value={60}>60 ngày gần nhất</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Card 3: Chains Selection */}
-            <div className="p-4 bg-slate-950/70 border border-slate-800/90 rounded-xl space-y-2">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1.5">
-                <Layers size={13} className="text-indigo-400" /> Chuỗi Áp Dụng Đồng Bộ
-              </label>
-              <div className="grid grid-cols-1 gap-1.5">
-                {[
-                  { id: 'fpt_shop', label: 'FPT Shop', badge: 'CallLog Excel (Headless)' },
-                  { id: 'long_chau', label: 'Long Châu', badge: 'Budibase Report API' },
-                  { id: 'vaccine', label: 'Vaccine', badge: 'Budibase Export API' },
-                ].map(c => {
-                  const isChecked = autoSyncForm.sync_chains.includes(c.id);
-                  return (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => {
-                        setAutoSyncForm(prev => {
-                          const exists = prev.sync_chains.includes(c.id);
-                          if (exists) {
-                            if (prev.sync_chains.length <= 1) return prev;
-                            return { ...prev, sync_chains: prev.sync_chains.filter(x => x !== c.id) };
-                          }
-                          return { ...prev, sync_chains: [...prev.sync_chains, c.id] };
-                        });
-                      }}
-                      className={`px-3 py-2 rounded-lg border text-left flex items-center justify-between transition-all cursor-pointer ${
-                        isChecked
-                          ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-200 font-bold'
-                          : 'bg-slate-900/60 border-slate-800 text-slate-500 hover:text-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className={`w-3.5 h-3.5 rounded flex items-center justify-center text-[10px] ${
-                          isChecked ? 'bg-indigo-600 text-white' : 'border border-slate-700 bg-slate-800'
-                        }`}>
-                          {isChecked && '✓'}
-                        </span>
-                        <span>{c.label}</span>
-                      </div>
-                      <span className="text-[10px] text-slate-400 font-mono">{c.badge}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-          </div>
-
-          {/* Schedule Metrics Bar */}
-          <div className="p-3.5 bg-slate-950/80 border border-slate-800 rounded-xl grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-            <div className="space-y-0.5">
-              <span className="text-slate-400 font-medium">Lần Đồng Bộ Gần Nhất:</span>
-              <div className="font-mono text-slate-200 font-bold flex items-center gap-2">
-                <span>{formatScheduleTime(autoSyncConfig?.last_run_at)}</span>
-                {autoSyncConfig?.last_status && (
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                    autoSyncConfig.last_status === 'SUCCESS' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-                    autoSyncConfig.last_status === 'PARTIAL' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
-                    'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                  }`}>
-                    {autoSyncConfig.last_status === 'SUCCESS' ? 'Thành công' : autoSyncConfig.last_status === 'PARTIAL' ? 'Một phần' : 'Có lỗi'}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-0.5">
-              <span className="text-slate-400 font-medium">Lần Đồng Bộ Kế Tiếp:</span>
-              <div className="font-mono text-indigo-400 font-bold">
-                {autoSyncForm.enabled ? formatScheduleTime(autoSyncConfig?.next_run_at) : 'Đang tạm dừng'}
-              </div>
-            </div>
-
-            <div className="space-y-0.5">
-              <span className="text-slate-400 font-medium">Ghi Chú Kết Quả Gần Nhất:</span>
-              <div className="text-slate-300 truncate" title={autoSyncConfig?.last_message || 'Chưa có dữ liệu'}>
-                {autoSyncConfig?.last_message || 'Chưa có thông tin'}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* === SECTION 2.5: LIVE LOG CONSOLE & SYNC DIAGNOSTICS === */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 backdrop-blur-xl shadow-2xl space-y-4">
-          
-          {/* Header & Controls */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl flex items-center justify-center">
-                <Terminal size={22} />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-base font-black text-white tracking-tight">Nhật Ký Hệ Thống & Đồng Bộ (Live Console)</h2>
-                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold flex items-center gap-1.5 ${
-                    isAutoRefreshLogs ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-400'
-                  }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${isAutoRefreshLogs ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
-                    {isAutoRefreshLogs ? 'Live 2.5s' : 'Đã dừng'}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-400 mt-0.5">Theo dõi trực tiếp từng bước kết nối Selenium, tải file Excel và gọi API FPT / Long Châu / Vaccine</p>
-              </div>
-            </div>
-
-            {/* Quick Actions & Trigger Test Sync */}
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={handleTestSyncFpt}
-                disabled={isTestingSync}
-                className="px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
-                title="Bấm để kích hoạt đồng bộ FPT ngay lập tức và xem log trực tiếp"
-              >
-                {isTestingSync ? <RefreshCw size={14} className="animate-spin" /> : <Play size={14} fill="currentColor" />}
-                {isTestingSync ? 'Đang chạy đồng bộ FPT...' : '⚡ Chạy Thử Đồng Bộ FPT Ngay'}
-              </button>
-
-              <button
-                onClick={fetchLogs}
-                disabled={isLoadingLogs}
-                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold border border-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
-                title="Tải lại log"
-              >
-                <RefreshCw size={14} className={isLoadingLogs ? "animate-spin" : ""} />
-                Làm mới
-              </button>
-
-              <button
-                onClick={handleClearLogs}
-                className="px-3 py-2 bg-slate-800 hover:bg-rose-900/40 text-slate-300 hover:text-rose-300 rounded-xl text-xs font-semibold border border-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
-                title="Xóa log hiện tại"
-              >
-                <Trash2 size={14} />
-                Xóa log
-              </button>
-
-              <button
-                onClick={handleDownloadLogs}
-                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold border border-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
-                title="Tải file log về máy"
-              >
-                <Download size={14} />
-                Tải log (.txt)
-              </button>
-            </div>
-          </div>
-
-          {/* Test Sync Banner Result if triggered */}
-          {testSyncResult && (
-            <div className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-between gap-3 ${
-              testSyncResult.success 
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' 
-                : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
-            }`}>
-              <div className="flex items-center gap-2">
-                {testSyncResult.success ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
-                <span><strong>Kết quả chạy thử FPT:</strong> {testSyncResult.message}</span>
-              </div>
-              <button onClick={() => setTestSyncResult(null)} className="text-slate-400 hover:text-white">✕</button>
-            </div>
-          )}
-
-          {/* Filter Bar & Options */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            
-            {/* Level Filters */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-slate-400 font-bold mr-1">Bộ lọc:</span>
-              {(['ALL', 'ERROR', 'WARNING', 'INFO'] as const).map(lvl => (
+              {/* Actions */}
+              <div className="flex flex-wrap items-center gap-2 text-xs">
                 <button
-                  key={lvl}
-                  onClick={() => setLogLevelFilter(lvl)}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-                    logLevelFilter === lvl
-                      ? (lvl === 'ERROR' ? 'bg-rose-500 text-white shadow' :
-                         lvl === 'WARNING' ? 'bg-amber-500 text-slate-950 shadow' :
-                         lvl === 'INFO' ? 'bg-blue-600 text-white shadow' :
-                         'bg-slate-200 text-slate-900 shadow')
-                      : 'bg-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-700'
-                  }`}
+                  onClick={handleTestSyncFpt}
+                  disabled={isTestingSync}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg transition-all disabled:opacity-50"
                 >
-                  {lvl === 'ALL' ? 'Tất cả' : lvl}
+                  {isTestingSync ? 'Đang chạy...' : 'Chạy thử FPT'}
                 </button>
-              ))}
+
+                <button
+                  onClick={fetchLogs}
+                  disabled={isLoadingLogs}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors border border-slate-700"
+                >
+                  Làm mới
+                </button>
+
+                <button
+                  onClick={handleClearLogs}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-rose-900/40 text-slate-300 hover:text-rose-300 rounded-lg transition-colors border border-slate-700"
+                >
+                  Xóa log
+                </button>
+
+                <button
+                  onClick={handleDownloadLogs}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors border border-slate-700"
+                >
+                  Tải .txt
+                </button>
+              </div>
             </div>
 
-            {/* Search Box & Auto-scroll Toggle */}
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  value={logSearch}
-                  onChange={(e) => setLogSearch(e.target.value)}
-                  placeholder="Lọc từ khóa (fpt, error, sync...)"
-                  className="pl-8 pr-3 py-1 bg-slate-950 border border-slate-800 rounded-lg text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 w-48 sm:w-56"
-                />
-                {logSearch && (
-                  <button 
-                    onClick={() => setLogSearch('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white text-xs"
-                  >
-                    ✕
-                  </button>
+            {/* Search & Options Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <input
+                type="text"
+                value={logSearch}
+                onChange={(e) => setLogSearch(e.target.value)}
+                placeholder="Tìm từ khóa (fpt, error, sync...)"
+                className="px-3 py-1 bg-slate-950 border border-slate-800 rounded-lg text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 w-52 sm:w-64"
+              />
+
+              <div className="flex items-center gap-3 text-slate-400">
+                <select
+                  value={logLinesLimit}
+                  onChange={(e) => setLogLinesLimit(Number(e.target.value))}
+                  className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-slate-300 text-xs focus:outline-none"
+                >
+                  <option value={100}>100 dòng</option>
+                  <option value={200}>200 dòng</option>
+                  <option value={500}>500 dòng</option>
+                  <option value={1000}>1000 dòng</option>
+                </select>
+
+                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={autoScrollLogs}
+                    onChange={(e) => setAutoScrollLogs(e.target.checked)}
+                    className="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-0"
+                  />
+                  <span>Tự cuộn</span>
+                </label>
+
+                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={isAutoRefreshLogs}
+                    onChange={(e) => setIsAutoRefreshLogs(e.target.checked)}
+                    className="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-0"
+                  />
+                  <span>Live</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Test result toast if any */}
+            {testSyncResult && (
+              <div className={`p-2.5 rounded-lg text-xs font-semibold flex items-center justify-between ${
+                testSyncResult.success ? 'bg-emerald-500/10 text-emerald-300' : 'bg-rose-500/10 text-rose-300'
+              }`}>
+                <span>{testSyncResult.message}</span>
+                <button onClick={() => setTestSyncResult(null)} className="text-slate-400 hover:text-white">✕</button>
+              </div>
+            )}
+
+            {/* Terminal Window */}
+            <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden">
+              <div className="px-3 py-1.5 bg-slate-900/80 border-b border-slate-800 flex items-center justify-between text-[11px] font-mono text-slate-400">
+                <span>Console Log ({logs.length} dòng)</span>
+              </div>
+              <div 
+                ref={logContainerRef}
+                className="p-3 max-h-[460px] overflow-y-auto space-y-0.5 font-mono text-[11px] leading-relaxed"
+              >
+                {logs.length === 0 ? (
+                  <div className="py-10 text-center text-slate-500">
+                    Chưa có dòng log nào được ghi nhận.
+                  </div>
+                ) : (
+                  logs.map((log, index) => {
+                    const isErr = log.level === 'ERROR' || log.message.toLowerCase().includes('fail') || log.message.toLowerCase().includes('lỗi');
+                    const isWarn = log.level === 'WARNING' || log.level === 'WARN';
+                    return (
+                      <div 
+                        key={log.id || index}
+                        className={`flex items-start gap-2 py-0.5 px-1 rounded ${
+                          isErr ? 'bg-rose-950/20 text-rose-200' :
+                          isWarn ? 'bg-amber-950/20 text-amber-200' :
+                          'text-slate-300'
+                        }`}
+                      >
+                        <span className="text-slate-600 select-none w-6 text-right shrink-0">{index + 1}</span>
+                        <span className="text-slate-500 shrink-0 select-none">[{log.timestamp.slice(11)}]</span>
+                        <span className={`px-1 rounded text-[9.5px] font-bold shrink-0 uppercase ${
+                          log.level === 'ERROR' ? 'text-rose-400' :
+                          log.level === 'WARNING' ? 'text-amber-400' :
+                          'text-blue-400'
+                        }`}>
+                          {log.level}
+                        </span>
+                        <span className="text-indigo-400 shrink-0 hidden sm:inline select-none">
+                          [{log.logger.replace('app.services.', '').replace('app.api.', '')}]
+                        </span>
+                        <span className="break-all whitespace-pre-wrap flex-1">{log.message}</span>
+                      </div>
+                    );
+                  })
                 )}
               </div>
-
-              <select
-                value={logLinesLimit}
-                onChange={(e) => setLogLinesLimit(Number(e.target.value))}
-                className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-slate-300 text-xs focus:outline-none focus:border-indigo-500"
-              >
-                <option value={100}>100 dòng</option>
-                <option value={200}>200 dòng</option>
-                <option value={500}>500 dòng</option>
-                <option value={1000}>1000 dòng</option>
-              </select>
-
-              <label className="flex items-center gap-1.5 text-slate-400 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={autoScrollLogs}
-                  onChange={(e) => setAutoScrollLogs(e.target.checked)}
-                  className="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-0"
-                />
-                <span>Cuộn tự động</span>
-              </label>
-
-              <label className="flex items-center gap-1.5 text-slate-400 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={isAutoRefreshLogs}
-                  onChange={(e) => setIsAutoRefreshLogs(e.target.checked)}
-                  className="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-0"
-                />
-                <span>Live</span>
-              </label>
             </div>
           </div>
+        )}
 
-          {/* Terminal Display */}
-          <div className="bg-slate-950/95 border border-slate-800/90 rounded-xl overflow-hidden shadow-inner">
+        {/* ======================================================== */}
+        {/* TAB 4: THÔNG BÁO & MẠNG (Clean Activity & LAN Access) */}
+        {/* ======================================================== */}
+        {activeTab === 'audit' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             
-            {/* Terminal Window Top Bar */}
-            <div className="px-3 py-2 bg-slate-900 border-b border-slate-800/80 flex items-center justify-between text-[11px] font-mono text-slate-400">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80 inline-block"></span>
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block"></span>
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block"></span>
-                <span className="ml-2 text-slate-400 font-bold">opsmonitor-daemon@server: ~/logs</span>
+            {/* Recent Notifications (Clean list matching image) */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <h2 className="text-sm font-bold text-white">Lịch sử thông báo đồng bộ</h2>
+                <span className="text-[11px] text-slate-400">10 sự kiện gần nhất</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span>Hiển thị: <strong>{logs.length}</strong> dòng</span>
-              </div>
-            </div>
 
-            {/* Terminal Log Lines Body */}
-            <div 
-              ref={logContainerRef}
-              className="p-3.5 max-h-[380px] overflow-y-auto space-y-1 font-mono text-[11px] leading-relaxed selection:bg-indigo-500 selection:text-white"
-            >
-              {logs.length === 0 ? (
-                <div className="py-12 text-center text-slate-500 space-y-1">
-                  <Terminal size={24} className="mx-auto text-slate-600" />
-                  <p>Chưa có log nào được ghi nhận hoặc không khớp với bộ lọc.</p>
-                  <p className="text-[10px] text-slate-600">Bấm "⚡ Chạy Thử Đồng Bộ FPT Ngay" ở trên để kiểm tra kết nối.</p>
-                </div>
-              ) : (
-                logs.map((log, index) => {
-                  const isErr = log.level === 'ERROR' || log.message.toLowerCase().includes('fail') || log.message.toLowerCase().includes('lỗi');
-                  const isWarn = log.level === 'WARNING' || log.level === 'WARN';
-                  const isSuccess = log.message.toLowerCase().includes('thành công') || log.message.toLowerCase().includes('succeeded') || log.message.toLowerCase().includes('complete');
-                  
-                  return (
-                    <div 
-                      key={log.id || index}
-                      className={`flex items-start gap-2 py-0.5 px-1.5 rounded transition-colors hover:bg-slate-900/60 ${
-                        isErr ? 'bg-rose-950/20 text-rose-200' :
-                        isWarn ? 'bg-amber-950/20 text-amber-200' :
-                        isSuccess ? 'bg-emerald-950/20 text-emerald-200' :
-                        'text-slate-300'
-                      }`}
-                    >
-                      {/* Line Number */}
-                      <span className="text-slate-600 select-none w-7 text-right shrink-0">{index + 1}</span>
-                      
-                      {/* Timestamp */}
-                      <span className="text-slate-500 shrink-0 select-none">[{log.timestamp.slice(11)}]</span>
-                      
-                      {/* Level Badge */}
-                      <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold shrink-0 select-none uppercase ${
-                        log.level === 'ERROR' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
-                        log.level === 'WARNING' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
-                        log.level === 'DEBUG' ? 'bg-slate-800 text-slate-400' :
-                        'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                      }`}>
-                        {log.level}
-                      </span>
-
-                      {/* Logger Module */}
-                      <span className="text-indigo-400 shrink-0 hidden sm:inline select-none">
-                        [{log.logger.replace('app.services.', '').replace('app.api.', '')}]:
-                      </span>
-
-                      {/* Message */}
-                      <span className="break-all whitespace-pre-wrap flex-1">
-                        {log.message}
-                      </span>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-          </div>
-
-        </div>
-
-        {/* === SECTION 3: SYSTEM AUDIT & RECENT NOTIFICATIONS === */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          
-          {/* Left: Recent Notifications / Sync Events */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 backdrop-blur-xl">
-            <div className="flex items-center justify-between mb-3.5">
-              <div className="flex items-center gap-2">
-                <Bell size={18} className="text-amber-400" />
-                <h2 className="text-sm font-bold text-white">Thông Báo Hoạt Động Mới Nhất</h2>
-              </div>
-              <span className="text-[11px] text-slate-400">Ghi nhận từ hệ thống</span>
-            </div>
-
-            <div className="space-y-2.5 max-h-[320px] overflow-y-auto pr-1">
-              {overview?.recent_notifications && overview.recent_notifications.length > 0 ? (
-                overview.recent_notifications.map(n => (
-                  <div key={n.id} className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-xl text-xs flex items-start justify-between gap-3">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
+              <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                {overview?.recent_notifications && overview.recent_notifications.length > 0 ? (
+                  overview.recent_notifications.map(n => (
+                    <div key={n.id} className="p-3 bg-slate-950 border border-slate-800/80 rounded-xl text-xs space-y-1">
+                      <div className="flex items-center justify-between">
                         <span className="font-bold text-slate-200">{n.title}</span>
-                        {n.chain && (
-                          <span className="px-1.5 py-0.2 bg-slate-800 text-[10px] text-slate-400 rounded">
-                            {n.chain}
-                          </span>
-                        )}
+                        <span className="text-[10px] text-slate-500 font-mono">
+                          {n.created_at ? parseUtcDate(n.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : ''}
+                        </span>
                       </div>
                       <p className="text-slate-400 text-[11px] leading-relaxed">{n.message}</p>
                     </div>
-                    <span className="text-[10px] text-slate-500 shrink-0 font-mono">
-                      {n.created_at ? parseUtcDate(n.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''}
-                    </span>
+                  ))
+                ) : (
+                  <div className="py-8 text-center text-slate-500 text-xs">
+                    Chưa có thông báo nào
                   </div>
-                ))
-              ) : (
-                <div className="py-8 text-center text-slate-500 text-xs">
-                  Chưa có thông báo mới nào
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right: Network & Access Tips for Admin */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 backdrop-blur-xl flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-3.5">
-                <div className="flex items-center gap-2">
-                  <Activity size={18} className="text-blue-400" />
-                  <h2 className="text-sm font-bold text-white">Thông Tin Mạng & Vận Hành Cho Admin</h2>
-                </div>
-                <span className="text-[11px] text-slate-400">Bảo mật</span>
-              </div>
-
-              <div className="space-y-3 text-xs">
-                <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-                  <div className="font-bold text-blue-300 mb-1 flex items-center gap-1.5">
-                    <Wifi size={14} /> Đường dẫn nội bộ cho văn phòng:
-                  </div>
-                  <div className="font-mono text-slate-200 bg-slate-950/60 p-2 rounded-lg border border-slate-800 select-all">
-                    http://10.96.25.111:8000
-                  </div>
-                  <p className="text-[11px] text-blue-400/80 mt-1">Dành cho 2 máy tính trong phòng, tốc độ tức thì, không cần mật khẩu IP.</p>
-                </div>
-
-                <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
-                  <div className="font-bold text-indigo-300 mb-1 flex items-center gap-1.5">
-                    <Shield size={14} /> Đường dẫn Admin Bí Mật:
-                  </div>
-                  <div className="font-mono text-slate-200 bg-slate-950/60 p-2 rounded-lg border border-slate-800 select-all">
-                    {window.location.origin}/#/admin
-                  </div>
-                  <p className="text-[11px] text-indigo-400/80 mt-1">Chỉ bạn biết đường link này để vào kiểm tra máy chủ và giám sát.</p>
-                </div>
+                )}
               </div>
             </div>
 
-            <div className="pt-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-              <span>Phiên bản: <strong className="text-slate-200">DashBoardD v2.4 Enterprise</strong></span>
-              <span className="text-[11px] text-slate-500">Cập nhật: {new Date(overview?.checked_at || Date.now()).toLocaleTimeString()}</span>
-            </div>
-          </div>
+            {/* Network Access */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+              <div>
+                <div className="pb-2 border-b border-slate-800 mb-3">
+                  <h2 className="text-sm font-bold text-white">Đường dẫn truy cập hệ thống</h2>
+                </div>
 
-        </div>
+                <div className="space-y-3 text-xs">
+                  <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
+                    <span className="font-bold text-slate-300 block">Đường dẫn mạng nội bộ (LAN):</span>
+                    <div className="font-mono text-slate-200 bg-slate-900 px-2.5 py-1.5 rounded border border-slate-800 select-all">
+                      http://10.96.25.111:8000
+                    </div>
+                    <p className="text-[11px] text-slate-400">Dành cho các máy tính chung phòng mạng nội bộ.</p>
+                  </div>
+
+                  <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
+                    <span className="font-bold text-slate-300 block">Đường dẫn Tên miền chính thức:</span>
+                    <div className="font-mono text-slate-200 bg-slate-900 px-2.5 py-1.5 rounded border border-slate-800 select-all">
+                      https://tophoploi.site
+                    </div>
+                    <p className="text-[11px] text-slate-400">Truy cập từ mọi nơi có kết nối internet.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                <span>DashBoardD Enterprise</span>
+                <span className="text-[11px] text-slate-500">
+                  Cập nhật: {new Date(overview?.checked_at || Date.now()).toLocaleTimeString()}
+                </span>
+              </div>
+            </div>
+
+          </div>
+        )}
 
       </div>
 
       {/* === MODAL: CHANGE PASSWORD === */}
       {isChangePwOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="font-bold text-white text-base flex items-center gap-2">
-                <Key size={18} className="text-indigo-400" /> Đổi Mật Khẩu Admin
-              </h3>
-              <button onClick={() => setIsChangePwOpen(false)} className="text-slate-400 hover:text-white">✕</button>
+              <h3 className="font-bold text-white text-sm">Đổi mật khẩu Admin</h3>
+              <button onClick={() => setIsChangePwOpen(false)} className="text-slate-400 hover:text-white text-xs">✕</button>
             </div>
 
-            <form onSubmit={handleChangePassword} className="space-y-3">
-              {pwError && (
-                <div className="p-2.5 bg-rose-500/20 border border-rose-500/40 rounded-xl text-rose-300 text-xs font-semibold">
-                  {pwError}
-                </div>
-              )}
-              {pwSuccess && (
-                <div className="p-2.5 bg-emerald-500/20 border border-emerald-500/40 rounded-xl text-emerald-300 text-xs font-semibold">
-                  {pwSuccess}
-                </div>
-              )}
+            {pwError && (
+              <div className="p-2.5 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-300 text-xs">
+                {pwError}
+              </div>
+            )}
+            {pwSuccess && (
+              <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-300 text-xs">
+                {pwSuccess}
+              </div>
+            )}
 
+            <form onSubmit={handleChangePassword} className="space-y-3 text-xs">
               <div>
-                <label className="block text-xs font-bold text-slate-400 mb-1">Mật khẩu hiện tại</label>
-                <input
-                  type="password"
+                <label className="block text-slate-400 font-semibold mb-1">Mật khẩu cũ</label>
+                <input 
+                  type="password" 
                   value={oldPw}
-                  onChange={(e) => setOldPw(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500"
+                  onChange={e => setOldPw(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-400 mb-1">Mật khẩu mới</label>
-                <input
-                  type="password"
+                <label className="block text-slate-400 font-semibold mb-1">Mật khẩu mới</label>
+                <input 
+                  type="password" 
                   value={newPw}
-                  onChange={(e) => setNewPw(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500"
-                  placeholder="Ít nhất 4 ký tự"
+                  onChange={e => setNewPw(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+                  placeholder="Tối thiểu 6 ký tự"
                   required
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsChangePwOpen(false)}
-                  className="px-3 py-1.5 bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-xl text-xs font-semibold"
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
-                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold"
+                  className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg text-xs"
                 >
-                  Lưu mật khẩu mới
+                  Lưu mật khẩu
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
     </div>
   );
 };

@@ -609,42 +609,16 @@ const Admin: React.FC = () => {
       <div className="max-w-6xl mx-auto space-y-5">
         
         {/* === TOP ADMIN HEADER (Minimal & Clean) === */}
-        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-2xl">
-          <div className="flex items-center gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg font-bold text-white tracking-tight">Quản trị hệ thống</h1>
-                <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  Root Admin
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Trạng thái: <span className="font-semibold text-emerald-400">{sys?.status || 'ONLINE'}</span> (Port {sys?.port || 8000}) · Chạy: <span className="text-slate-300 font-mono">{sys?.uptime_str || '0s'}</span>
-              </p>
-            </div>
+        <header className="flex flex-wrap items-center justify-between gap-3 bg-slate-900 border border-slate-800 px-4 py-3 sm:px-5 sm:py-3.5 rounded-2xl">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-white text-sm tracking-wide">Cấu hình Hệ thống</span>
+            <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              Root Admin
+            </span>
           </div>
 
-          {/* Action Links & Buttons without icons */}
+          {/* Action Links & Buttons */}
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => setAutoRefresh(!autoRefresh)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                autoRefresh 
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' 
-                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              {autoRefresh ? "• Live 5s" : "Tạm dừng"}
-            </button>
-
-            <button
-              onClick={fetchOverview}
-              disabled={isLoadingOverview}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium border border-slate-700 transition-colors"
-            >
-              {isLoadingOverview ? "Đang tải..." : "Làm mới"}
-            </button>
-
             <button
               onClick={() => setIsChangePwOpen(true)}
               className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium border border-slate-700 transition-colors"

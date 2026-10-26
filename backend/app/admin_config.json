@@ -30,5 +30,6 @@
       "token": "20da98d87f4f6b1d4d0e0c5387734239",
       "created_at": 1792816456.4471314
     }
-  ]
+  ],
+  "totp_secret": "QCBG6IJJSHI7Y7XG"
 }

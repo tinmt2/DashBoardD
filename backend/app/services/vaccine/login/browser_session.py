@@ -12,6 +12,7 @@ class VaccineBrowserSession(BaseBrowserSession):
         self._sso_clicked = False
         self._closing_thread_started = False
         self._initial_probed = True
+        self._auto_otp_attempted = False
         super().start(probe_only=probe_only, headless=headless)
         if getattr(self, '_needs_storage_clear', False) and self.driver:
             try:
@@ -118,8 +119,19 @@ class VaccineBrowserSession(BaseBrowserSession):
                         has_otp_field = bool(self.driver.find_elements(By.NAME, "LoginInput.Otp") or self.driver.find_elements(By.CLASS_NAME, "input-otp"))
                     except: pass
 
-                    if has_otp_field or "vui lòng nhập mã otp" in page_source or "mã xác thực không hợp lệ" in page_source or "mã xác nhận không đúng" in page_source:
+                    if has_otp_field or "vui lòng nhập mã otp" in page_source:
+                        from app.core.totp import get_current_totp_code
+                        auto_otp = get_current_totp_code()
+                        if auto_otp and not getattr(self, "_auto_otp_attempted", False):
+                            self._auto_otp_attempted = True
+                            logger.info(f"[{self.profile_name}] Tự động lấy mã TOTP từ Authenticator Secret và submit...")
+                            self.submit_otp(auto_otp)
+                            return self.get_status()
                         self.status = "OTP_REQUIRED"
+                        try: self.driver.maximize_window()
+                        except: pass
+                    elif "mã xác thực không hợp lệ" in page_source or "mã xác nhận không đúng" in page_source:
+                        self.status = "OTP_INVALID"
                         try: self.driver.maximize_window()
                         except: pass
                     else:

@@ -52,6 +52,12 @@ class ChangePasswordRequest(BaseModel):
     old_password: str
     new_password: str
 
+class TotpConfigRequest(BaseModel):
+    secret: str
+
+class TestTotpRequest(BaseModel):
+    secret: Optional[str] = None
+
 @router.post("/login")
 def admin_login(req: LoginRequest):
     cfg = _get_config()
@@ -104,6 +110,91 @@ def change_password(req: ChangePasswordRequest, authorization: Optional[str] = H
     cfg["admin_password_hash"] = _hash_pw(req.new_password)
     _save_config(cfg)
     return {"success": True, "message": "Đổi mật khẩu Admin thành công!"}
+
+@router.get("/totp-config")
+def get_totp_config(authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Yêu cầu quyền Admin!")
+    token = authorization.replace("Bearer ", "").strip()
+    cfg = _get_config()
+    valid_tokens = [t["token"] for t in cfg.get("active_tokens", [])]
+    if token not in valid_tokens:
+        raise HTTPException(status_code=401, detail="Phiên đăng nhập không hợp lệ!")
+    
+    secret = (cfg.get("totp_secret") or "").strip()
+    from app.core.totp import generate_totp
+    current_code = generate_totp(secret) if secret else None
+    
+    # Mask secret if returning (e.g. show first 4 and last 4)
+    masked_secret = ""
+    if secret:
+        if len(secret) > 8:
+            masked_secret = secret[:4] + "*" * (len(secret) - 8) + secret[-4:]
+        else:
+            masked_secret = "********"
+            
+    return {
+        "has_secret": bool(secret),
+        "masked_secret": masked_secret,
+        "raw_secret": secret,
+        "current_code": current_code
+    }
+
+@router.post("/totp-config")
+def save_totp_config(req: TotpConfigRequest, authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Yêu cầu quyền Admin!")
+    token = authorization.replace("Bearer ", "").strip()
+    cfg = _get_config()
+    valid_tokens = [t["token"] for t in cfg.get("active_tokens", [])]
+    if token not in valid_tokens:
+        raise HTTPException(status_code=401, detail="Phiên đăng nhập không hợp lệ!")
+    
+    from app.core.totp import extract_secret_from_input, generate_totp
+    raw = req.secret.strip()
+    secret = ""
+    if raw:
+        extracted = extract_secret_from_input(raw)
+        if not extracted:
+            raise HTTPException(status_code=400, detail="Không thể nhận diện Secret Key! Vui lòng kiểm tra lại chuỗi hoặc link xuất Authenticator.")
+        secret = extracted
+    
+    cfg["totp_secret"] = secret
+    _save_config(cfg)
+    
+    code = generate_totp(secret) if secret else None
+    return {
+        "success": True, 
+        "has_secret": bool(secret),
+        "secret": secret,
+        "current_code": code,
+        "message": "Đã trích xuất và lưu Secret Key thành công!" if secret else "Đã xóa Secret Key!"
+    }
+
+@router.post("/totp-config/test")
+def test_totp_config(req: TestTotpRequest, authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Yêu cầu quyền Admin!")
+    token = authorization.replace("Bearer ", "").strip()
+    cfg = _get_config()
+    valid_tokens = [t["token"] for t in cfg.get("active_tokens", [])]
+    if token not in valid_tokens:
+        raise HTTPException(status_code=401, detail="Phiên đăng nhập không hợp lệ!")
+    
+    secret = (req.secret or cfg.get("totp_secret") or "").strip().replace(" ", "").upper()
+    if not secret:
+        raise HTTPException(status_code=400, detail="Chưa có Secret Key để kiểm tra!")
+        
+    from app.core.totp import generate_totp
+    code = generate_totp(secret)
+    if not code:
+        raise HTTPException(status_code=400, detail="Secret Key không đúng định dạng Base32!")
+        
+    return {
+        "success": True,
+        "code": code,
+        "message": f"Mã TOTP 6 số hiện tại là: {code}"
+    }
 
 @router.get("/overview")
 def admin_overview(db: Session = Depends(get_db)):

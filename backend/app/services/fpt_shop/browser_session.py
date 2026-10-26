@@ -88,6 +88,7 @@ class FPTBrowserSession(BaseBrowserSession):
 
     def start(self, probe_only=False, headless=False):
         self._closing_thread_started = False
+        self._auto_otp_attempted = False
         return super().start(probe_only=probe_only, headless=headless)
 
     def get_status(self):
@@ -161,6 +162,14 @@ class FPTBrowserSession(BaseBrowserSession):
                         self.status = "OTP_INVALID"
                         self._force_show_window()
                     elif has_otp_field or "vui lòng nhập mã otp" in page_source:
+                        # Auto-fill OTP if Secret Key is configured
+                        from app.core.totp import get_current_totp_code
+                        auto_otp = get_current_totp_code()
+                        if auto_otp and not getattr(self, "_auto_otp_attempted", False):
+                            self._auto_otp_attempted = True
+                            logger.info(f"[{self.profile_name}] Tự động lấy mã TOTP từ Authenticator Secret và submit...")
+                            self.submit_otp(auto_otp)
+                            return self.get_status()
                         self.status = "OTP_REQUIRED"
                         self._force_show_window()
                     else:

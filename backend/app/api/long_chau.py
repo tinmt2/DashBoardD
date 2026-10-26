@@ -77,6 +77,21 @@ def long_chau_auth_start(req: Optional[AuthStartReq] = None):
         session.temp_creds = req.dict()
         session._save_creds(session.temp_creds)
     status = session.start()
+    
+    # If credentials were provided, give the browser a moment to auto-login and handle TOTP
+    if req and req.username and req.password:
+        import time
+        for _ in range(12):
+            time.sleep(0.5)
+            status = session.get_status()
+            if status in ("AUTHENTICATED", "LOGIN_FAILED", "OTP_INVALID"):
+                break
+            if status == "OTP_REQUIRED":
+                time.sleep(1.0)
+                status = session.get_status()
+                if status == "AUTHENTICATED":
+                    break
+                    
     return {"authenticated": status == "AUTHENTICATED", "status": status}
 
 @router.post("/auth/otp")

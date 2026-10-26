@@ -101,14 +101,20 @@ def auth_start(req: AuthStartRequest = None):
     if status == "ERROR":
         raise HTTPException(status_code=500, detail="Browser failed to start")
         
-    # If credentials were provided, give the browser up to 3 seconds to auto-submit and redirect
+    # If credentials were provided, give the browser up to 6 seconds to auto-submit, fill OTP if needed, and redirect
     if creds and creds.get("username") and creds.get("password"):
         import time
-        for _ in range(6):
+        for _ in range(12):
             time.sleep(0.5)
             status = session.get_status()
-            if status in ("AUTHENTICATED", "LOGIN_FAILED", "OTP_REQUIRED"):
+            if status in ("AUTHENTICATED", "LOGIN_FAILED", "OTP_INVALID"):
                 break
+            # If OTP_REQUIRED, let it try one more time as get_status() might trigger auto-TOTP
+            if status == "OTP_REQUIRED":
+                time.sleep(1.0)
+                status = session.get_status()
+                if status == "AUTHENTICATED":
+                    break
 
     return AuthStatusResponse(
         authenticated=(status == "AUTHENTICATED"),

@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Eye, EyeOff, Loader2
+  Eye, EyeOff, Loader2, KeyRound, Check, RefreshCw
 } from 'lucide-react';
 import { 
   getAutoSyncConfig, 
@@ -58,7 +58,7 @@ interface SystemOverview {
   checked_at: string;
 }
 
-type AdminTab = 'system' | 'autosync' | 'logs' | 'audit';
+type AdminTab = 'system' | 'autosync' | 'totp' | 'logs' | 'audit';
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
@@ -112,6 +112,16 @@ const Admin: React.FC = () => {
   const [isSavingAutoSync, setIsSavingAutoSync] = useState(false);
   const [isTriggeringAutoSync, setIsTriggeringAutoSync] = useState(false);
   const [autoSyncFeedback, setAutoSyncFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Authenticator (TOTP) State
+  const [totpSecret, setTotpSecret] = useState('');
+  const [hasTotpSecret, setHasTotpSecret] = useState(false);
+  const [maskedTotpSecret, setMaskedTotpSecret] = useState('');
+  const [currentTotpCode, setCurrentTotpCode] = useState<string | null>(null);
+  const [totpCountdown, setTotpCountdown] = useState(30 - (Math.floor(Date.now() / 1000) % 30));
+  const [isSavingTotp, setIsSavingTotp] = useState(false);
+  const [totpFeedback, setTotpFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [showTotpSecret, setShowTotpSecret] = useState(false);
 
   // 1. Verify token on load
   useEffect(() => {
@@ -233,17 +243,118 @@ const Admin: React.FC = () => {
     fetchAutoSync();
   }, [token]);
 
+  // Fetch TOTP Config
+  const fetchTotpConfig = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/admin/totp-config', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setHasTotpSecret(data.has_secret);
+        setMaskedTotpSecret(data.masked_secret || '');
+        if (data.raw_secret) {
+          setTotpSecret(data.raw_secret);
+        }
+        setCurrentTotpCode(data.current_code || null);
+      }
+    } catch (err) {
+      console.warn('Lỗi khi tải cấu hình TOTP:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (!token) return;
+    fetchTotpConfig();
+  }, [token, activeTab]);
+
+  // TOTP countdown timer & auto-refresh code
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const sec = Math.floor(Date.now() / 1000);
+      const remaining = 30 - (sec % 30);
+      setTotpCountdown(remaining);
+      if (remaining === 30 && activeTab === 'totp' && token) {
+        fetchTotpConfig();
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [activeTab, token]);
+
+  const handleSaveTotp = async () => {
+    if (!token) return;
+    setIsSavingTotp(true);
+    setTotpFeedback(null);
+    try {
+      const res = await fetch('/api/admin/totp-config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ secret: totpSecret })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || 'Lỗi khi lưu Secret Key');
+      }
+      setTotpFeedback({ type: 'success', message: data.message || 'Đã lưu Secret Key thành công!' });
+      if (data.secret) {
+        setTotpSecret(data.secret);
+      }
+      await fetchTotpConfig();
+      setTimeout(() => setTotpFeedback(null), 4000);
+    } catch (err: any) {
+      setTotpFeedback({ type: 'error', message: err.message || 'Lỗi khi lưu Secret Key' });
+    } finally {
+      setIsSavingTotp(false);
+    }
+  };
+
+  const handleToggleAutoSync = async () => {
+    const nextState = !autoSyncForm.enabled;
+    const newForm = { ...autoSyncForm, enabled: nextState };
+    setAutoSyncForm(newForm);
+    setIsSavingAutoSync(true);
+    setAutoSyncFeedback(null);
+    try {
+      const updated = await updateAutoSyncConfig(newForm);
+      setAutoSyncConfig(updated);
+      setAutoSyncFeedback({
+        type: 'success',
+        message: nextState
+          ? `Đã BẬT tự động quét! Chu kỳ: mỗi ${newForm.interval_minutes} phút.`
+          : 'Đã TẮT tự động quét dữ liệu ngầm.',
+      });
+      setTimeout(() => setAutoSyncFeedback(null), 4000);
+    } catch (err: any) {
+      setAutoSyncFeedback({
+        type: 'error',
+        message: err.message || 'Lỗi khi cập nhật trạng thái tự động quét.',
+      });
+    } finally {
+      setIsSavingAutoSync(false);
+    }
+  };
+
   const handleSaveAutoSync = async () => {
     setIsSavingAutoSync(true);
     setAutoSyncFeedback(null);
     try {
       const updated = await updateAutoSyncConfig(autoSyncForm);
       setAutoSyncConfig(updated);
+      setAutoSyncForm({
+        enabled: updated.enabled,
+        interval_minutes: updated.interval_minutes,
+        sync_chains: updated.sync_chains,
+        date_range_days: updated.date_range_days,
+      });
       setAutoSyncFeedback({
         type: 'success',
-        message: autoSyncForm.enabled
-          ? `Đã lưu! Quét tự động mỗi ${autoSyncForm.interval_minutes} phút.`
-          : 'Đã lưu! Đã tắt quét tự động ngầm.',
+        message: updated.enabled
+          ? `Đã lưu thành công! Server sẽ tự động quét mỗi ${updated.interval_minutes} phút.`
+          : 'Đã lưu! Tiến trình tự động quét hiện đang TẮT.',
       });
       setTimeout(() => setAutoSyncFeedback(null), 4000);
     } catch (err: any) {
@@ -260,10 +371,14 @@ const Admin: React.FC = () => {
     setIsTriggeringAutoSync(true);
     setAutoSyncFeedback(null);
     try {
+      // Lưu cấu hình form hiện tại trước khi kích hoạt chạy
+      const updated = await updateAutoSyncConfig(autoSyncForm);
+      setAutoSyncConfig(updated);
+
       const res = await triggerAutoSyncRunNow();
       setAutoSyncFeedback({
         type: 'success',
-        message: res.message || 'Đã kích hoạt quét ngầm ngay bây giờ! Chuyển sang tab Nhật ký Log để xem.',
+        message: res.message || 'Đã lưu cấu hình và kích hoạt quét ngầm ngay bây giờ! Chuyển sang tab Nhật ký Log để xem.',
       });
       setTimeout(async () => {
         await fetchLogs();
@@ -477,6 +592,13 @@ const Admin: React.FC = () => {
     );
   }
 
+  const hasUnsavedChanges = Boolean(autoSyncConfig && (
+    autoSyncForm.enabled !== autoSyncConfig.enabled ||
+    autoSyncForm.interval_minutes !== autoSyncConfig.interval_minutes ||
+    autoSyncForm.date_range_days !== autoSyncConfig.date_range_days ||
+    JSON.stringify(autoSyncForm.sync_chains.slice().sort()) !== JSON.stringify(autoSyncConfig.sync_chains.slice().sort())
+  ));
+
   // === RENDER: STREAMLINED ADMIN DASHBOARD ===
   const sys = overview?.system;
   const db = overview?.database;
@@ -571,6 +693,19 @@ const Admin: React.FC = () => {
           >
             <span className={`w-1.5 h-1.5 rounded-full ${autoSyncConfig?.enabled ? 'bg-emerald-500' : 'bg-slate-600'}`} />
             Tự động đồng bộ
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('totp')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              activeTab === 'totp'
+                ? 'bg-white text-slate-950 shadow-sm'
+                : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 border border-slate-800/60'
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${hasTotpSecret ? 'bg-indigo-400' : 'bg-slate-600'}`} />
+            Authenticator (2FA Tự động)
           </button>
 
           <button
@@ -754,11 +889,11 @@ const Admin: React.FC = () => {
               </div>
 
               {autoSyncConfig?.enabled ? (
-                <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 self-start sm:self-auto">
-                  • Đang bật
+                <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 self-start sm:self-auto flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Đang bật (Live)
                 </span>
               ) : (
-                <span className="px-2.5 py-0.5 rounded text-[11px] font-semibold bg-slate-800 text-slate-400 self-start sm:self-auto">
+                <span className="px-2.5 py-0.5 rounded text-[11px] font-semibold bg-slate-800 text-slate-400 border border-slate-700 self-start sm:self-auto">
                   Đang tắt
                 </span>
               )}
@@ -781,22 +916,24 @@ const Admin: React.FC = () => {
               {/* Toggle Switch */}
               <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl flex flex-col justify-between">
                 <div>
-                  <span className="text-xs font-bold text-slate-300 block mb-1">Trạng thái hoạt động</span>
+                  <span className="text-xs font-bold text-slate-300 block mb-1">Trạng thái tự động</span>
                   <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Bật để server tự động quét định kỳ theo chu kỳ bên dưới.
+                    Bấm để chuyển đổi nhanh giữa Bật và Tắt tiến trình quét tự động.
                   </p>
                 </div>
                 <div className="mt-3">
                   <button
                     type="button"
-                    onClick={() => setAutoSyncForm(prev => ({ ...prev, enabled: !prev.enabled }))}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    onClick={handleToggleAutoSync}
+                    disabled={isSavingAutoSync}
+                    className={`w-full px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
                       autoSyncForm.enabled 
-                        ? 'bg-emerald-600 text-white' 
-                        : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-900/40' 
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
                     }`}
                   >
-                    {autoSyncForm.enabled ? '✓ Đang kích hoạt' : 'Tắt quét ngầm'}
+                    <span className={`w-2 h-2 rounded-full ${autoSyncForm.enabled ? 'bg-white animate-pulse' : 'bg-slate-500'}`} />
+                    {autoSyncForm.enabled ? 'Đang BẬT — Bấm để Tắt' : 'Đang TẮT — Bấm để Bật'}
                   </button>
                 </div>
               </div>
@@ -807,15 +944,36 @@ const Admin: React.FC = () => {
                   <label className="text-xs font-bold text-slate-300 block mb-1">
                     Chu kỳ quét (phút)
                   </label>
-                  <input
-                    type="number"
-                    min={15}
-                    max={1440}
-                    value={autoSyncForm.interval_minutes}
-                    onChange={(e) => setAutoSyncForm(prev => ({ ...prev, interval_minutes: Number(e.target.value) }))}
-                    className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white text-xs font-mono focus:outline-none focus:border-indigo-500"
-                  />
-                  <span className="text-[10px] text-slate-500 mt-1 block">Khuyến nghị: 60 phút</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={5}
+                      max={1440}
+                      value={autoSyncForm.interval_minutes}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        setAutoSyncForm(prev => ({ ...prev, interval_minutes: isNaN(val) ? 15 : val }));
+                      }}
+                      className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white text-xs font-mono focus:outline-none focus:border-indigo-500"
+                    />
+                    <div className="flex gap-1 shrink-0">
+                      {[15, 30, 60, 120].map(mins => (
+                        <button
+                          key={mins}
+                          type="button"
+                          onClick={() => setAutoSyncForm(prev => ({ ...prev, interval_minutes: mins }))}
+                          className={`px-2 py-1 rounded text-[11px] font-bold border transition-colors cursor-pointer ${
+                            autoSyncForm.interval_minutes === mins
+                              ? 'bg-indigo-600 border-indigo-500 text-white'
+                              : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          {mins}p
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-slate-500 mt-1 block">Bấm nhanh: 15p, 30p, 60p, 120p hoặc tự nhập số</span>
                 </div>
 
                 <div>
@@ -874,7 +1032,7 @@ const Admin: React.FC = () => {
               <div>
                 <span className="text-slate-400 block text-[11px]">Lần quét kế tiếp:</span>
                 <span className="font-mono text-indigo-400 font-bold">
-                  {autoSyncForm.enabled ? formatScheduleTime(autoSyncConfig?.next_run_at) : 'Đang tạm dừng'}
+                  {autoSyncConfig?.enabled ? formatScheduleTime(autoSyncConfig?.next_run_at) : 'Đang tạm dừng (Chưa bật)'}
                 </span>
               </div>
               <div>
@@ -886,14 +1044,18 @@ const Admin: React.FC = () => {
             </div>
 
             {/* Save & Run Action Buttons */}
-            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800">
+            <div className="flex flex-wrap items-center gap-2.5 pt-2 border-t border-slate-800">
               <button
                 type="button"
                 onClick={handleSaveAutoSync}
                 disabled={isSavingAutoSync}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer disabled:opacity-50"
+                className={`px-4 py-2 font-bold text-xs rounded-xl transition-all cursor-pointer disabled:opacity-50 ${
+                  hasUnsavedChanges
+                    ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 ring-2 ring-indigo-400/40'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                }`}
               >
-                {isSavingAutoSync ? 'Đang lưu...' : 'Lưu cấu hình'}
+                {isSavingAutoSync ? 'Đang lưu...' : hasUnsavedChanges ? 'Lưu thay đổi (Có sửa đổi)' : 'Lưu cấu hình'}
               </button>
 
               <button
@@ -904,6 +1066,160 @@ const Admin: React.FC = () => {
               >
                 {isTriggeringAutoSync ? 'Đang kích hoạt...' : 'Chạy quét ngầm ngay'}
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {activeTab === 'totp' && (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+              <div>
+                <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                  <KeyRound size={16} className="text-indigo-400" />
+                  Cấu hình Authenticator Secret Key (Đăng nhập tự động 100%)
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Dùng chung 1 Secret Key cho cả 3 chuỗi: <span className="text-slate-300 font-semibold">FPT Shop</span>, <span className="text-slate-300 font-semibold">Long Châu</span> và <span className="text-slate-300 font-semibold">Vaccine</span>.
+                </p>
+              </div>
+
+              {hasTotpSecret ? (
+                <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 self-start sm:self-auto flex items-center gap-1.5">
+                  <Check size={12} />
+                  • Đã kích hoạt 2FA tự động
+                </span>
+              ) : (
+                <span className="px-2.5 py-0.5 rounded text-[11px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 self-start sm:self-auto">
+                  Chưa cài Secret Key
+                </span>
+              )}
+            </div>
+
+            {/* Notification Feedback */}
+            {totpFeedback && (
+              <div className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
+                totpFeedback.type === 'success' 
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                  : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+              }`}>
+                {totpFeedback.message}
+              </div>
+            )}
+
+            {/* Live OTP Preview Card */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 bg-slate-950 border border-slate-800/90 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                    Mã xác thực TOTP hiện tại
+                  </span>
+                  <button
+                    type="button"
+                    onClick={fetchTotpConfig}
+                    className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors"
+                    title="Làm mới mã"
+                  >
+                    <RefreshCw size={13} />
+                  </button>
+                </div>
+
+                <div className="flex items-baseline gap-3">
+                  <div className="text-3xl font-extrabold tracking-widest font-mono text-indigo-400 bg-indigo-950/40 px-3 py-1.5 rounded-lg border border-indigo-800/40 inline-block">
+                    {currentTotpCode || '------'}
+                  </div>
+                  {currentTotpCode && (
+                    <div className="text-xs text-slate-400 flex items-center gap-1.5">
+                      <span>Đổi sau:</span>
+                      <span className={`font-mono font-bold ${totpCountdown <= 5 ? 'text-rose-400 animate-pulse' : 'text-emerald-400'}`}>
+                        {totpCountdown}s
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Khi đến bước xác thực OTP của FPT Shop, Long Châu hoặc Vaccine, hệ thống sẽ tự tính toán mã 6 số này và gửi thẳng vào hệ thống mà không cần bạn mở điện thoại hay thao tác tay.
+                </p>
+              </div>
+
+              <div className="p-4 bg-slate-950 border border-slate-800/90 rounded-xl space-y-3">
+                <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                  Trạng thái tự động áp dụng
+                </span>
+                <div className="space-y-2 text-xs text-slate-400">
+                  <div className="flex items-center justify-between py-1 border-b border-slate-900">
+                    <span className="text-slate-300">FPT Shop (CallLog)</span>
+                    <span className="text-emerald-400 font-semibold">Tự điền OTP + Submit</span>
+                  </div>
+                  <div className="flex items-center justify-between py-1 border-b border-slate-900">
+                    <span className="text-slate-300">Long Châu (Budibase SSO)</span>
+                    <span className="text-emerald-400 font-semibold">Tự điền OTP + Submit</span>
+                  </div>
+                  <div className="flex items-center justify-between py-1">
+                    <span className="text-slate-300">Vaccine (PTT Public SSO)</span>
+                    <span className="text-emerald-400 font-semibold">Tự điền OTP + Submit</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Secret Key Input Form */}
+            <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-3">
+              <label className="text-xs font-bold text-slate-200 block">
+                Chuỗi Secret Key 2FA (Mã bí mật từ Authenticator):
+              </label>
+              
+              <div className="relative max-w-xl">
+                <input
+                  type={showTotpSecret ? "text" : "password"}
+                  value={totpSecret}
+                  onChange={(e) => setTotpSecret(e.target.value)}
+                  placeholder="Dán chuỗi Secret Key dạng chữ (VD: JBSWY3DPEHPK3PXP...)"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 font-mono tracking-wider focus:outline-none focus:border-indigo-500 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowTotpSecret(!showTotpSecret)}
+                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-200"
+                >
+                  {showTotpSecret ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+
+              {maskedTotpSecret && (
+                <div className="text-[11px] text-slate-400">
+                  Khóa hiện tại đang lưu: <span className="font-mono text-slate-300">{maskedTotpSecret}</span>
+                </div>
+              )}
+
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                * Chuỗi Secret Key thường gồm các ký tự Base32 (A-Z và 2-7). Bạn có thể xóa khoảng trắng hoặc để nguyên, hệ thống sẽ tự làm sạch chuỗi.
+              </p>
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={handleSaveTotp}
+                  disabled={isSavingTotp}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isSavingTotp ? <Loader2 size={13} className="animate-spin" /> : null}
+                  {isSavingTotp ? 'Đang lưu...' : 'Lưu Secret Key'}
+                </button>
+
+                {totpSecret && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTotpSecret('');
+                    }}
+                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-xs rounded-xl transition-all"
+                  >
+                    Xóa nhập
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}

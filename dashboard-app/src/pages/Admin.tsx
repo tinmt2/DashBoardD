@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Eye, EyeOff, Loader2, KeyRound, Check, RefreshCw
+  Eye, EyeOff, Loader2, KeyRound, Check, RefreshCw, Copy
 } from 'lucide-react';
 import { 
   getAutoSyncConfig, 
@@ -952,33 +952,36 @@ const Admin: React.FC = () => {
                   <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
                     Mã xác thực TOTP hiện tại
                   </span>
-                  <button
-                    type="button"
-                    onClick={fetchTotpConfig}
-                    className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors"
-                    title="Làm mới mã"
-                  >
-                    <RefreshCw size={13} />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    {currentTotpCode && (
+                      <button
+                        type="button"
+                        onClick={handleCopyTotp}
+                        className={`p-1.5 rounded transition-all ${
+                          copiedTotp 
+                            ? 'text-emerald-400 bg-emerald-500/10' 
+                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                        }`}
+                        title={copiedTotp ? "Đã chép vào clipboard" : "Sao chép mã TOTP"}
+                      >
+                        {copiedTotp ? <Check size={14} /> : <Copy size={14} />}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={fetchTotpConfig}
+                      className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors"
+                      title="Làm mới mã"
+                    >
+                      <RefreshCw size={14} />
+                    </button>
+                  </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-baseline gap-3">
                   <div className="text-3xl font-extrabold tracking-widest font-mono text-indigo-400 bg-indigo-950/40 px-3 py-1.5 rounded-lg border border-indigo-800/40 inline-block">
                     {currentTotpCode || '------'}
                   </div>
-                  {currentTotpCode && (
-                    <button
-                      type="button"
-                      onClick={handleCopyTotp}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-                        copiedTotp
-                          ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
-                          : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
-                      }`}
-                    >
-                      {copiedTotp ? "✓ Đã chép" : "Sao chép mã"}
-                    </button>
-                  )}
                   {currentTotpCode && (
                     <div className="text-xs text-slate-400 flex items-center gap-1.5">
                       <span>Đổi sau:</span>

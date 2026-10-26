@@ -122,6 +122,26 @@ const Admin: React.FC = () => {
   const [isSavingTotp, setIsSavingTotp] = useState(false);
   const [totpFeedback, setTotpFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [showTotpSecret, setShowTotpSecret] = useState(false);
+  const [copiedTotp, setCopiedTotp] = useState(false);
+
+  const handleCopyTotp = async () => {
+    if (!currentTotpCode) return;
+    try {
+      await navigator.clipboard.writeText(currentTotpCode);
+      setCopiedTotp(true);
+      setTimeout(() => setCopiedTotp(false), 2000);
+    } catch {
+      // Fallback
+      const input = document.createElement('input');
+      input.value = currentTotpCode;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      document.body.removeChild(input);
+      setCopiedTotp(true);
+      setTimeout(() => setCopiedTotp(false), 2000);
+    }
+  };
 
   // 1. Verify token on load
   useEffect(() => {
@@ -942,10 +962,23 @@ const Admin: React.FC = () => {
                   </button>
                 </div>
 
-                <div className="flex items-baseline gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <div className="text-3xl font-extrabold tracking-widest font-mono text-indigo-400 bg-indigo-950/40 px-3 py-1.5 rounded-lg border border-indigo-800/40 inline-block">
                     {currentTotpCode || '------'}
                   </div>
+                  {currentTotpCode && (
+                    <button
+                      type="button"
+                      onClick={handleCopyTotp}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                        copiedTotp
+                          ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                          : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
+                      }`}
+                    >
+                      {copiedTotp ? "✓ Đã chép" : "Sao chép mã"}
+                    </button>
+                  )}
                   {currentTotpCode && (
                     <div className="text-xs text-slate-400 flex items-center gap-1.5">
                       <span>Đổi sau:</span>
@@ -955,10 +988,6 @@ const Admin: React.FC = () => {
                     </div>
                   )}
                 </div>
-
-                <p className="text-[11px] text-slate-400 leading-relaxed">
-                  Khi đến bước xác thực OTP của FPT Shop, Long Châu hoặc Vaccine, hệ thống sẽ tự tính toán mã 6 số này và gửi thẳng vào hệ thống mà không cần bạn mở điện thoại hay thao tác tay.
-                </p>
               </div>
 
               <div className="p-4 bg-slate-950 border border-slate-800/90 rounded-xl space-y-3">

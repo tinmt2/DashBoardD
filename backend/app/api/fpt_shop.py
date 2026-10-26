@@ -152,13 +152,13 @@ class SyncResponse(BaseModel):
     source: str = "INTERNAL_WEB"
     start_date: date
     end_date: date
-    file_name: str = ""
+    file_name: Optional[str] = ""
     total_rows: int = 0
     new_records: int = 0
     updated_records: int = 0
     duplicate_records: int = 0
     invalid_records: int = 0
-    error_message: str = None
+    error_message: Optional[str] = None
 
 
 from app.services.fpt_shop.sync_db import sync_fpt_shop_data

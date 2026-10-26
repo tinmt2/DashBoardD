@@ -58,7 +58,7 @@ interface SystemOverview {
   checked_at: string;
 }
 
-type AdminTab = 'system' | 'autosync' | 'totp' | 'logs' | 'audit';
+type AdminTab = 'autosync' | 'totp' | 'logs' | 'audit';
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
@@ -70,7 +70,7 @@ const Admin: React.FC = () => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Active Tab state (Lucian #039 Sliding Pill Tabs)
-  const [activeTab, setActiveTab] = useState<AdminTab>('system');
+  const [activeTab, setActiveTab] = useState<AdminTab>('autosync');
 
   // Overview data
   const [overview, setOverview] = useState<SystemOverview | null>(null);
@@ -672,18 +672,6 @@ const Admin: React.FC = () => {
         <div className="flex items-center justify-start border-b border-slate-800 pb-3 gap-2 overflow-x-auto">
           <button
             type="button"
-            onClick={() => setActiveTab('system')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === 'system'
-                ? 'bg-white text-slate-950 shadow-sm'
-                : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 border border-slate-800/60'
-            }`}
-          >
-            Hệ thống & Kết nối
-          </button>
-
-          <button
-            type="button"
             onClick={() => setActiveTab('autosync')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
               activeTab === 'autosync'
@@ -734,151 +722,7 @@ const Admin: React.FC = () => {
         </div>
 
         {/* ======================================================== */}
-        {/* TAB 1: HỆ THỐNG & KẾT NỐI (Streamlined Metrics) */}
-        {/* ======================================================== */}
-        {activeTab === 'system' && (
-          <div className="space-y-4">
-            {/* Server & Hardware Summary */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-              
-              {/* Server Status */}
-              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Máy chủ</span>
-                <div className="text-xl font-bold text-white flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                  {sys?.status || 'ONLINE'}
-                </div>
-                <div className="mt-2 text-[11px] text-slate-400">
-                  Cổng: <span className="font-mono text-slate-200 font-bold">{sys?.port || 8000}</span>
-                </div>
-              </div>
-
-              {/* CPU */}
-              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">CPU</span>
-                <div className="text-xl font-bold text-white font-mono">{sys?.cpu_percent ?? 0}%</div>
-                <div className="w-full bg-slate-800 rounded-full h-1 mt-2.5 overflow-hidden">
-                  <div 
-                    className={`h-full rounded-full ${
-                      (sys?.cpu_percent ?? 0) > 80 ? 'bg-rose-500' : 'bg-indigo-500'
-                    }`}
-                    style={{ width: `${Math.min(sys?.cpu_percent ?? 0, 100)}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* RAM */}
-              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Bộ nhớ RAM</span>
-                <div className="text-xl font-bold text-white font-mono">{sys?.ram_percent ?? 0}%</div>
-                <div className="mt-1 text-[11px] text-slate-400 font-mono">
-                  {sys?.ram_used_gb} / {sys?.ram_total_gb} GB
-                </div>
-              </div>
-
-              {/* Database */}
-              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Cơ sở dữ liệu SQLite</span>
-                <div className="text-xl font-bold text-white font-mono">{db?.db_size_mb ?? 0} MB</div>
-                <div className="mt-1 text-[11px] text-emerald-400 font-bold">
-                  {db?.total_tickets.toLocaleString() ?? 0} dòng dữ liệu
-                </div>
-              </div>
-
-            </div>
-
-            {/* 3 Chains Status (Clean Flat Table-like Cards) */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-              <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800/80">
-                <h2 className="text-sm font-bold text-white">Trạng thái kết nối 3 chuỗi</h2>
-                <span className="text-xs text-slate-400">Tự động kiểm tra phiên làm việc</span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {/* FPT Shop */}
-                <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-sm text-white">FPT Shop</span>
-                    {chains?.fpt_shop.authenticated ? (
-                      <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        Đã xác thực
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                        {chains?.fpt_shop.status || 'Chưa kết nối'}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-xs text-slate-400 space-y-1">
-                    <div className="flex justify-between">
-                      <span>Cơ chế:</span>
-                      <span className="text-slate-300">Chrome Headless</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Dữ liệu:</span>
-                      <span className="font-bold text-rose-400 font-mono">{db?.fpt_tickets.toLocaleString() ?? 0} dòng</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Long Châu */}
-                <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-sm text-white">Long Châu</span>
-                    {chains?.long_chau.authenticated ? (
-                      <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        Đã xác thực
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                        {chains?.long_chau.status || 'Chưa kết nối'}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-xs text-slate-400 space-y-1">
-                    <div className="flex justify-between">
-                      <span>Cơ chế:</span>
-                      <span className="text-slate-300">Budibase Session</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Dữ liệu:</span>
-                      <span className="font-bold text-blue-400 font-mono">{db?.long_chau_tickets.toLocaleString() ?? 0} dòng</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Vaccine */}
-                <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-sm text-white">Vaccine</span>
-                    {chains?.vaccine.authenticated ? (
-                      <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        Đã xác thực
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                        {chains?.vaccine.status || 'Chưa kết nối'}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-xs text-slate-400 space-y-1">
-                    <div className="flex justify-between">
-                      <span>Cơ chế:</span>
-                      <span className="text-slate-300">PTT Public</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Dữ liệu:</span>
-                      <span className="font-bold text-teal-400 font-mono">{db?.vaccine_tickets.toLocaleString() ?? 0} dòng</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ======================================================== */}
-        {/* TAB 2: TỰ ĐỘNG ĐỒNG BỘ (Clean Auto-Sync Scheduler) */}
+        {/* TAB: TỰ ĐỘNG ĐỒNG BỘ (Clean Auto-Sync Scheduler) */}
         {/* ======================================================== */}
         {activeTab === 'autosync' && (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-5">

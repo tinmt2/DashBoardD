@@ -42,6 +42,7 @@ class LongChauApiClient:
                 rows = data.get("data", []) if "data" in data else data.get("rows", [])
                 
                 if rows:
+                    all_rows.extend(rows)
                     first_date = rows[0].get("Created At") or rows[0].get("createdAt") or ""
                     last_date = rows[-1].get("Created At") or rows[-1].get("createdAt") or ""
                     logger.info(f"Fetched chunk of {len(rows)} rows. Date range: {first_date} to {last_date}")
@@ -50,12 +51,9 @@ class LongChauApiClient:
                         is_descending = first_date >= last_date
                         if is_descending and last_date < stop_before_date:
                             logger.info(f"Reached data older than {stop_before_date} (descending mode). Stopping fetch early.")
-                            # all_rows.extend(rows) is already done below
                             break
                         elif not is_descending:
                             logger.warning(f"Data is sorted ASCENDING! Cannot break early. {first_date} -> {last_date}")
-                        
-                all_rows.extend(rows)
                 
                 bookmark = data.get("bookmark")
                 if not bookmark:

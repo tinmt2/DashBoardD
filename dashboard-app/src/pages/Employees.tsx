@@ -4,7 +4,6 @@ import { Search, Plus, Edit2, MoveRight, ShieldAlert, X, Check } from 'lucide-re
 import { EmployeeService } from '../services/employeeService';
 import type { Employee, Chain } from '../types';
 import { GlassCard } from '../components/common/GlassCard';
-import { useSidebar } from '../components/layout/Layout';
 
 const CHAINS: Chain[] = ['FPT Shop', 'Long Châu', 'Vaccine'];
 
@@ -74,7 +73,6 @@ const EmployeeNoteCell: React.FC<EmployeeNoteCellProps> = ({ employeeId, initial
 };
 
 const Employees: React.FC = () => {
-  const { isCollapsed } = useSidebar();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -211,65 +209,91 @@ const Employees: React.FC = () => {
   };
 
   return (
-    <div className={`w-full ${isCollapsed ? 'px-3.5 sm:px-6 py-3 sm:py-4' : 'px-3.5 sm:px-6 lg:px-12 py-4 sm:py-8 lg:py-10'} pb-16 relative z-10 animate-fade-in text-slate-800`}>
+    <div className="w-full px-3.5 sm:px-6 py-3 sm:py-4 pb-16 relative z-10 animate-fade-in text-slate-800">
       
-      {/* Header & Metrics - Chỉ hiển thị khi Sidebar KHÔNG thu nhỏ */}
-      {!isCollapsed && (
-        <>
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h1 className="text-[24px] sm:text-[28px] font-bold text-slate-900 tracking-tight">Quản lý nhân viên</h1>
-            </div>
-            <button 
-              onClick={() => setIsAddModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[12px] font-bold text-[14px] transition-colors shadow-sm cursor-pointer"
+      {/* Header & Metrics - Nhỏ gọn, tinh gọn ngang hàng tiết kiệm không gian tối đa */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3.5">
+        <div className="flex items-center gap-3 flex-wrap">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight shrink-0">
+            Quản lý nhân viên
+          </h1>
+          
+          {/* Quick Metrics Badges / Interactive Chain Filter Pills */}
+          <div className="flex items-center gap-1.5 flex-wrap text-xs">
+            <button
+              type="button"
+              onClick={() => setChainFilter('All')}
+              className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer border ${
+                chainFilter === 'All'
+                  ? 'bg-slate-800 text-white border-slate-800 shadow-xs'
+                  : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+              }`}
+              title="Xem tất cả nhân sự"
             >
-              <Plus className="w-4 h-4" />
-              Thêm nhân viên
+              Tổng: <span className="font-extrabold">{metrics.total}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setChainFilter(chainFilter === 'FPT Shop' ? 'All' : 'FPT Shop')}
+              className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer border ${
+                chainFilter === 'FPT Shop'
+                  ? 'bg-orange-600 text-white border-orange-600 shadow-xs'
+                  : 'bg-orange-50/80 hover:bg-orange-100 text-orange-700 border-orange-200/70'
+              }`}
+              title="Lọc nhân sự FPT Shop"
+            >
+              FPT Shop: <span className="font-extrabold">{metrics.fpt}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setChainFilter(chainFilter === 'Long Châu' ? 'All' : 'Long Châu')}
+              className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer border ${
+                chainFilter === 'Long Châu'
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                  : 'bg-blue-50/80 hover:bg-blue-100 text-blue-700 border-blue-200/70'
+              }`}
+              title="Lọc nhân sự Long Châu"
+            >
+              Long Châu: <span className="font-extrabold">{metrics.longchau}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setChainFilter(chainFilter === 'Vaccine' ? 'All' : 'Vaccine')}
+              className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer border ${
+                chainFilter === 'Vaccine'
+                  ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                  : 'bg-purple-50/80 hover:bg-purple-100 text-purple-700 border-purple-200/70'
+              }`}
+              title="Lọc nhân sự Vaccine"
+            >
+              Vaccine: <span className="font-extrabold">{metrics.vaccine}</span>
             </button>
           </div>
+        </div>
 
-          {/* Metrics (Combined Bento Grid - Compact) */}
-          <div className="w-full max-w-[580px]">
-            <GlassCard className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 relative overflow-hidden mb-6 bg-white/60 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-200/60 rounded-2xl">
-              <div className="relative z-10 pl-2">
-                <div className="mb-2">
-                  <span className="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Tổng nhân sự</span>
-                </div>
-                <div className="text-[44px] sm:text-[54px] font-black text-slate-800 leading-none tracking-tight">{metrics.total}</div>
-              </div>
-
-              <div className="relative z-10 w-full sm:w-[240px] flex flex-col gap-2">
-                <div className="bg-white/80 backdrop-blur-md border border-slate-200/60 px-3.5 py-2 rounded-xl flex justify-between items-center shadow-2xs">
-                  <span className="text-[11.5px] font-bold text-slate-500 uppercase tracking-wider">FPT Shop</span>
-                  <span className="text-[16px] font-bold text-slate-800 leading-none">{metrics.fpt}</span>
-                </div>
-
-                <div className="bg-white/80 backdrop-blur-md border border-slate-200/60 px-3.5 py-2 rounded-xl flex justify-between items-center shadow-2xs">
-                  <span className="text-[11.5px] font-bold text-slate-500 uppercase tracking-wider">Long Châu</span>
-                  <span className="text-[16px] font-bold text-slate-800 leading-none">{metrics.longchau}</span>
-                </div>
-
-                <div className="bg-white/80 backdrop-blur-md border border-slate-200/60 px-3.5 py-2 rounded-xl flex justify-between items-center shadow-2xs">
-                  <span className="text-[11.5px] font-bold text-slate-500 uppercase tracking-wider">Vaccine</span>
-                  <span className="text-[16px] font-bold text-slate-800 leading-none">{metrics.vaccine}</span>
-                </div>
-              </div>
-            </GlassCard>
-          </div>
-        </>
-      )}
+        <button 
+          type="button"
+          onClick={() => setIsAddModalOpen(true)}
+          className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-[13px] transition-colors shadow-sm cursor-pointer shrink-0 ml-auto sm:ml-0"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Thêm nhân viên</span>
+        </button>
+      </div>
 
       {/* Filters Bar */}
-      <div className="flex gap-2.5 sm:gap-4 mb-4 sm:mb-6 items-center flex-wrap">
+      <div className="flex gap-2.5 sm:gap-3 mb-3 items-center flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-md">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input 
             type="text" 
-            placeholder="Tìm theo Mã Inside, Mail, họ tên..." 
+            placeholder="Tìm theo Mã Inside, Mail, họ tên, ghi chú..." 
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 rounded-[12px] border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-[14px]"
+            className="w-full pl-9 pr-4 py-2 rounded-[12px] border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-[13.5px]"
           />
         </div>
         
@@ -283,13 +307,11 @@ const Employees: React.FC = () => {
           <option value="Long Châu">Long Châu</option>
           <option value="Vaccine">Vaccine</option>
         </select>
-        
-
 
         <select 
           value={sortBy}
           onChange={e => setSortBy(e.target.value as any)}
-          className={`px-3.5 py-2 rounded-[12px] border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-[13.5px] font-medium ${isCollapsed ? '' : 'ml-auto'}`}
+          className="px-3.5 py-2 rounded-[12px] border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-[13.5px] font-medium ml-auto"
         >
           <option value="insideCode">Sắp xếp theo Mã Inside</option>
           <option value="id">Sắp xếp theo Mail</option>
@@ -297,19 +319,6 @@ const Employees: React.FC = () => {
           <option value="chain">Sắp xếp theo Chuỗi</option>
           <option value="startDate">Sắp xếp theo Ngày bắt đầu</option>
         </select>
-
-        {/* Khi thu nhỏ sidebar: hiển thị nút "+ Thêm nhân viên" tại đây */}
-        {isCollapsed && (
-          <button 
-            type="button"
-            onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[12px] font-bold text-[13px] transition-colors shadow-sm cursor-pointer ml-auto shrink-0"
-            title="Thêm nhân viên mới"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Thêm nhân viên</span>
-          </button>
-        )}
       </div>
 
       {/* Table */}

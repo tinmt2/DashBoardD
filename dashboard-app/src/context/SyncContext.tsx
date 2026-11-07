@@ -19,6 +19,8 @@ export interface SyncDateOptions {
   startDate?: Date | null;
   endDate?: Date | null;
   filterMode?: 'all' | number | 'custom';
+  syncMode?: 'current_month' | 'specific_month' | 'days' | 'custom';
+  specificMonth?: string | null; // e.g. "2026-10"
 }
 
 interface SyncContextType {
@@ -44,8 +46,35 @@ export const useSync = () => {
 };
 
 function computeDateRange(options?: SyncDateOptions): { syncStartDate: string; syncEndDate: string } {
-  const { startDate, endDate, filterMode } = options || {};
+  const { startDate, endDate, filterMode, syncMode, specificMonth } = options || {};
 
+  // 1. Quet theo thang cu the (vi du: "2026-10")
+  if (syncMode === 'specific_month' && specificMonth && specificMonth.includes('-')) {
+    const [y, m] = specificMonth.split('-').map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    const now = new Date();
+    let endDay = lastDay;
+    if (now.getFullYear() === y && now.getMonth() + 1 === m) {
+      endDay = now.getDate();
+    }
+    const startStr = `${y}-${m.toString().padStart(2, '0')}-01`;
+    const endStr = `${y}-${m.toString().padStart(2, '0')}-${endDay.toString().padStart(2, '0')}`;
+    return { syncStartDate: startStr, syncEndDate: endStr };
+  }
+
+  // 2. Quet theo thang hien tai (ngay 1 den hom nay)
+  if (syncMode === 'current_month') {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = (now.getMonth() + 1).toString().padStart(2, '0');
+    const d = now.getDate().toString().padStart(2, '0');
+    return {
+      syncStartDate: `${y}-${m}-01`,
+      syncEndDate: `${y}-${m}-${d}`
+    };
+  }
+
+  // 3. Quet theo khoang ngay tuy chon
   if (filterMode === 'custom' && startDate) {
     const effEndDate = endDate || startDate;
     const startStr = new Date(startDate.getTime() - startDate.getTimezoneOffset() * 60000).toISOString().split('T')[0];
@@ -59,13 +88,15 @@ function computeDateRange(options?: SyncDateOptions): { syncStartDate: string; s
     const endStr = new Date(end.getTime() - end.getTimezoneOffset() * 60000).toISOString().split('T')[0];
     return { syncStartDate: startStr, syncEndDate: endStr };
   } else {
-    // Default / 'all' mode: sync last 30 days
-    const end = new Date();
-    const start = new Date();
-    start.setDate(end.getDate() - 30);
-    const startStr = new Date(start.getTime() - start.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-    const endStr = new Date(end.getTime() - end.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-    return { syncStartDate: startStr, syncEndDate: endStr };
+    // 4. Mac dinh: Quet theo THANG HIEN TAI (ngay 01 den ngay hom nay)
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = (now.getMonth() + 1).toString().padStart(2, '0');
+    const d = now.getDate().toString().padStart(2, '0');
+    return {
+      syncStartDate: `${y}-${m}-01`,
+      syncEndDate: `${y}-${m}-${d}`
+    };
   }
 }
 

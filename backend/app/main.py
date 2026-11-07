@@ -36,9 +36,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from app.api import health, fpt_shop, long_chau, long_chau_dashboard, vaccine, vaccine_dashboard, notifications, admin, employees, auto_sync
+from app.api import health, fpt_shop, long_chau, long_chau_dashboard, vaccine, vaccine_dashboard, notifications, admin, employees, auto_sync, inside
 
 app.include_router(health.router, prefix="/api")
+app.include_router(inside.router, prefix="/api")
 app.include_router(admin.router, prefix="/api/admin")
 app.include_router(employees.router, prefix="/api/employees")
 app.include_router(fpt_shop.router, prefix="/api/fpt-shop")
@@ -75,13 +76,30 @@ if os.path.exists(frontend_dist):
 
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
+        from fastapi import HTTPException
+        # 1. API routes must 404 if not matched by routers
         if full_path.startswith("api/"):
-            from fastapi import HTTPException
             raise HTTPException(status_code=404, detail="API route not found")
         
-        file_path = os.path.join(frontend_dist, full_path)
-        if os.path.isfile(file_path):
+        # 2. Block common internet crawler / vulnerability scanning probes
+        clean_path = full_path.lower().strip()
+        blocked_exts = (".env", ".php", ".sql", ".bak", ".old", ".save", ".swp", ".dist", ".yml", ".yaml", ".ini", ".conf", ".config", ".xml", ".db", ".sqlite", ".git", ".sh", ".bash", ".log", ".tar", ".gz", ".zip", ".rar", ".7z", ".asp", ".aspx", ".jsp", ".action", ".do", ".cgi")
+        blocked_prefixes = ("wp-", "wordpress", "phpmyadmin", "actuator", "cgi-bin", "autodiscover", ".git", ".env", ".aws", ".config", ".svn", "solr", "telescope")
+        
+        if any(clean_path.startswith(p) or f"/{p}" in clean_path for p in blocked_prefixes) or any(clean_path.endswith(ext) for ext in blocked_exts):
+            raise HTTPException(status_code=404, detail="Not found")
+
+        # 3. Safe static file lookup with path-traversal prevention
+        file_path = os.path.abspath(os.path.join(frontend_dist, full_path))
+        if os.path.commonpath([file_path, frontend_dist]) == frontend_dist and os.path.isfile(file_path):
             return FileResponse(file_path)
+        
+        # 4. If request has a file extension (e.g. non-existent file) but not found on disk, return 404
+        basename = os.path.basename(clean_path)
+        if "." in basename and not basename.startswith("."):
+            raise HTTPException(status_code=404, detail="File not found")
+
+        # 5. Clean SPA client-side routes (e.g. /admin, /dashboard, /login) -> serve index.html
         return FileResponse(
             os.path.join(frontend_dist, "index.html"),
             headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"}

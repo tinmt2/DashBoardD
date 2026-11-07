@@ -2,8 +2,12 @@ from pathlib import Path
 from pydantic_settings import BaseSettings
 from typing import Optional
 
+import os
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 DEFAULT_DB_PATH = (BASE_DIR / "opsmonitor.db").as_posix()
+BROWSER_DATA_DIR = str((BASE_DIR / ".browser").resolve())
+os.makedirs(BROWSER_DATA_DIR, exist_ok=True)
 
 class Settings(BaseSettings):
     DATABASE_URL: str = f"sqlite:///{DEFAULT_DB_PATH}"
@@ -21,5 +25,6 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        extra = "ignore"
 
 settings = Settings()

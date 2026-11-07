@@ -272,8 +272,8 @@ const NotificationCard: React.FC<CardProps> = ({ item, onMarkRead, onDelete }) =
     item.sync_type === 'VACCINE' ? 'Vaccine' : 'Hệ thống'
   );
 
-  const titleText = isAutoSync ? (isMultiChain ? 'Tự động đồng bộ ngầm' : chainName) : (isMultiChain ? 'Đồng bộ tất cả 3 chuỗi' : chainName);
-  const modeText = isExcel ? 'Nhập Excel' : isAutoSync ? 'Định kỳ máy chủ' : 'Tự động';
+  const titleText = isAutoSync ? (isMultiChain ? 'Tự động cập nhật' : chainName) : (isMultiChain ? 'Đồng bộ tất cả 3 chuỗi' : chainName);
+  const modeText = isExcel ? 'Nhập Excel' : isAutoSync ? '' : 'Tự động';
   const totalNew = item.total_new_errors || (singleChainDetail?.new_records ?? 0);
   const unitLabel = getChainUnit(chainName);
 
@@ -297,9 +297,11 @@ const NotificationCard: React.FC<CardProps> = ({ item, onMarkRead, onDelete }) =
           <span className="text-[13.5px] font-bold text-slate-800 tracking-tight truncate">
             {titleText}
           </span>
-          <span className="text-[11px] font-medium text-slate-400 shrink-0">
-            • {modeText}
-          </span>
+          {modeText && (
+            <span className="text-[11px] font-medium text-slate-400 shrink-0">
+              • {modeText}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">

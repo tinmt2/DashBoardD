@@ -5,6 +5,8 @@ export interface AutoSyncConfig {
   interval_minutes: number;
   sync_chains: string[];
   date_range_days: number;
+  sync_mode?: 'current_month' | 'specific_month' | 'days';
+  specific_month?: string | null;
   last_run_at: string | null;
   next_run_at: string | null;
   last_status: 'SUCCESS' | 'PARTIAL' | 'FAILED' | null;
@@ -17,6 +19,8 @@ export interface UpdateAutoSyncPayload {
   interval_minutes?: number;
   sync_chains?: string[];
   date_range_days?: number;
+  sync_mode?: 'current_month' | 'specific_month' | 'days';
+  specific_month?: string | null;
 }
 
 export const getAutoSyncConfig = async (): Promise<AutoSyncConfig> => {
@@ -50,7 +54,7 @@ export const triggerAutoSyncRunNow = async (): Promise<{ success: boolean; messa
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.detail || 'Không thể kích hoạt đồng bộ ngay bây giờ');
+    throw new Error(err.detail || 'Không thể kích hoạt tiến trình đồng bộ');
   }
-  return response.json();
+  return await response.json();
 };

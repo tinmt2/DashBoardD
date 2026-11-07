@@ -1,3 +1,4 @@
+from app.core.config import BROWSER_DATA_DIR
 import os
 import threading
 from selenium import webdriver
@@ -16,6 +17,7 @@ def get_profile_lock(profile_name):
         return _profile_locks[profile_name]
 
 logger = logging.getLogger(__name__)
+logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
 
 _active_profiles_refs = {} # profile_name -> list of instances
 
@@ -55,18 +57,18 @@ class BaseBrowserSession:
 
     def _save_creds(self, creds: dict):
         try:
-            creds_dir = os.path.abspath(os.path.join(os.getcwd(), ".browser"))
+            creds_dir = BROWSER_DATA_DIR
             os.makedirs(creds_dir, exist_ok=True)
             creds_file = os.path.join(creds_dir, f"{self.profile_name}_creds.json")
             import json
             with open(creds_file, "w", encoding="utf-8") as f:
-                json.dump(creds, f)
+                json.dump(creds, f, indent=2)
         except Exception:
             pass
 
     def _load_creds(self) -> dict:
         try:
-            creds_file = os.path.abspath(os.path.join(os.getcwd(), ".browser", f"{self.profile_name}_creds.json"))
+            creds_file = os.path.join(BROWSER_DATA_DIR, f"{self.profile_name}_creds.json")
             if os.path.exists(creds_file):
                 import json
                 with open(creds_file, "r", encoding="utf-8") as f:
@@ -77,19 +79,19 @@ class BaseBrowserSession:
 
     def _cleanup_orphaned_processes(self, profile_path: str):
         try:
-            if os.name == 'nt':
-                # Windows process cleanup
-                output = subprocess.check_output('wmic process where "name=\'chrome.exe\'" get commandline,processid', shell=True).decode('utf-8', errors='ignore')
-                for line in output.splitlines():
-                    if self.profile_name in line:
-                        parts = line.strip().split()
-                        pid = parts[-1]
-                        if pid.isdigit():
-                            logger.info(f"Killing orphaned Chrome process for {self.profile_name}: {pid}")
-                            subprocess.call(['taskkill', '/F', '/PID', pid], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            else:
-                # Linux process cleanup
-                subprocess.call(f"pkill -f '{self.profile_name}'", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            import psutil
+            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+                try:
+                    pname = (proc.info.get('name') or '').lower()
+                    if 'chrome' in pname:
+                        cmdline = ' '.join(proc.info.get('cmdline') or [])
+                        if self.profile_name in cmdline:
+                            logger.info(f"Killing orphaned Chrome process for {self.profile_name}: {proc.pid}")
+                            proc.kill()
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+        except Exception:
+            pass
             
             # Also clean up the lockfile if it still exists
             lock_file = os.path.join(profile_path, "lockfile")
@@ -180,7 +182,7 @@ class BaseBrowserSession:
                     options.add_argument("--headless=new")
                 
                 # Create a specific profile directory
-                profile_path = os.path.abspath(os.path.join(os.getcwd(), ".browser", self.profile_name))
+                profile_path = os.path.join(BROWSER_DATA_DIR, self.profile_name)
                 options.add_argument(f"user-data-dir={profile_path}")
                 
                 # Enable Password Manager in Chrome & avoid crash restore prompts

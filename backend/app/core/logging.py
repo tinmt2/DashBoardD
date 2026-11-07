@@ -30,6 +30,9 @@ def setup_logging():
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.INFO)
     
+    # Silence harmless urllib3 connection pool warnings from Selenium's localhost client
+    logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
+    
     if _memory_handler not in root_logger.handlers:
         root_logger.addHandler(_memory_handler)
         

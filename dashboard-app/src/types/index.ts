@@ -45,6 +45,46 @@ export interface EmployeeTransferHistory {
   transferredBy?: string;
 }
 
+// ─── Monthly Shift Schedule & SharePoint ──────────────────────────────────────
+
+export interface MonthlyScheduleLink {
+  id?: number;
+  month: string; // YYYY-MM e.g. "2026-11"
+  title?: string;
+  fileName?: string;
+  sharepointUrl: string;
+  note?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SharePointAuthStatus {
+  authenticated: boolean;
+  status: string; // "AUTHENTICATED" | "LOGIN_REQUIRED" | "STOPPED" | "STARTING"
+  hasCookies?: boolean;
+  profileName?: string;
+}
+
+export interface ShiftDateHeader {
+  date: string; // YYYY-MM-DD
+  dayOfWeek: string; // "Thứ 2", "Thứ 3"...
+}
+
+export interface EmployeeShiftRow {
+  id: string; // Mail
+  code?: string; // Mã số NV
+  name: string;
+  chain: Chain;
+  shifts: Record<string, string>; // date (YYYY-MM-DD) -> shift_type ("Ca Sáng", "Trực đêm"...)
+}
+
+export interface ScheduleMatrixData {
+  month: string;
+  dates: ShiftDateHeader[];
+  employees: EmployeeShiftRow[];
+  totalEmployees: number;
+}
+
 // ─── Calllog / Ticket Error Record ───────────────────────────────────────────
 
 export interface CalllogError {

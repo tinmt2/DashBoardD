@@ -114,6 +114,35 @@ export const LucianDateRangePicker: React.FC<LucianDateRangePickerProps> = ({
     }
   };
 
+  // Quick month selection helpers
+  const handleSelectCurrentMonth = () => {
+    const start = new Date(today.getFullYear(), today.getMonth(), 1);
+    const end = today;
+    setDraftStart(start);
+    setDraftEnd(end);
+    setViewYear(today.getFullYear());
+    setViewMonth(today.getMonth());
+  };
+
+  const handleSelectPrevMonth = () => {
+    const prevMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const y = prevMonthDate.getFullYear();
+    const m = prevMonthDate.getMonth();
+    const lastDay = new Date(y, m + 1, 0);
+    setDraftStart(new Date(y, m, 1));
+    setDraftEnd(lastDay);
+    setViewYear(y);
+    setViewMonth(m);
+  };
+
+  const handleSelectEntireMonth = (y: number, m: number) => {
+    const isCur = y === today.getFullYear() && m === today.getMonth();
+    const start = new Date(y, m, 1);
+    const end = isCur ? today : new Date(y, m + 1, 0);
+    setDraftStart(start);
+    setDraftEnd(end);
+  };
+
   // Select all days
   const handleSelectAllDays = () => {
     onApply('all', null, null);
@@ -225,6 +254,36 @@ export const LucianDateRangePicker: React.FC<LucianDateRangePickerProps> = ({
             <span className="text-[12px] font-bold text-slate-800">{formatDateVN(draftEnd || draftStart)}</span>
           </div>
         </div>
+      </div>
+
+      {/* Quick Month / Preset Filters */}
+      <div className="flex items-center gap-1.5 py-2 px-0.5 border-b border-slate-100 overflow-x-auto scrollbar-none">
+        <button
+          type="button"
+          onClick={handleSelectCurrentMonth}
+          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap border ${
+            draftStart && draftEnd && isSameDay(draftStart, new Date(today.getFullYear(), today.getMonth(), 1)) && isSameDay(draftEnd, today)
+              ? 'bg-indigo-50 text-indigo-700 border-indigo-200 shadow-2xs'
+              : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-50 border-slate-200'
+          }`}
+        >
+          Tháng này ({today.getMonth() + 1}/{today.getFullYear()})
+        </button>
+        <button
+          type="button"
+          onClick={handleSelectPrevMonth}
+          className="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap border text-slate-600 hover:text-indigo-600 hover:bg-slate-50 border-slate-200"
+        >
+          Tháng trước
+        </button>
+        <button
+          type="button"
+          onClick={() => handleSelectEntireMonth(viewYear, viewMonth)}
+          className="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap border text-slate-600 hover:text-indigo-600 hover:bg-slate-50 border-slate-200"
+          title={`Chọn trọn vẹn Tháng ${viewMonth + 1}/${viewYear}`}
+        >
+          Chọn cả T{viewMonth + 1}
+        </button>
       </div>
 
       {/* Month Navigation */}

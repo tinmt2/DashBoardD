@@ -10,6 +10,7 @@ import TitleBar from './TitleBar';
 import { getFptShopAuthStatus, startFptShopAuth } from '../../services/fptShopApi';
 import { startLongChauAuth } from '../../services/longChauApi';
 import { startVaccineAuth } from '../../services/vaccineApi';
+import { getInsideCreds, saveInsideCreds } from '../../services/insideApi';
 import { getAutoSyncConfig, updateAutoSyncConfig, triggerAutoSyncRunNow, AutoSyncConfig } from '../../services/autoSyncApi';
 import { useNotification } from '../../context/NotificationContext';
 import { useSync } from '../../context/SyncContext';
@@ -109,12 +110,31 @@ const Layout: React.FC = () => {
       } catch (e) {}
     }
 
-    // Automatically check FPT Shop login status in background when web opens
-    getFptShopAuthStatus().then(res => {
-      if (!res.authenticated && res.status === 'STOPPED') {
-        startFptShopAuth(creds).catch(() => {});
+    // Fetch authoritative credentials from server to survive restarts
+    getInsideCreds().then(serverCreds => {
+      if (serverCreds.username) {
+        const activeCreds = {
+          username: serverCreds.username,
+          password: serverCreds.password || creds.password || ''
+        };
+        setFptCreds(activeCreds);
+        localStorage.setItem('fptCreds', JSON.stringify(activeCreds));
+        creds = activeCreds;
       }
-    }).catch(() => {});
+      
+      // Automatically check FPT Shop login status in background when web opens
+      getFptShopAuthStatus().then(res => {
+        if (!res.authenticated && res.status === 'STOPPED' && creds.username && creds.password) {
+          startFptShopAuth(creds).catch(() => {});
+        }
+      }).catch(() => {});
+    }).catch(() => {
+      getFptShopAuthStatus().then(res => {
+        if (!res.authenticated && res.status === 'STOPPED' && creds.username && creds.password) {
+          startFptShopAuth(creds).catch(() => {});
+        }
+      }).catch(() => {});
+    });
   }, []);
 
   useEffect(() => {
@@ -126,6 +146,10 @@ const Layout: React.FC = () => {
   const saveSettings = () => {
     localStorage.setItem('fptCreds', JSON.stringify(fptCreds));
     setIsSettingsOpen(false);
+    // Persist permanently on backend server
+    saveInsideCreds(fptCreds).catch(err => {
+      console.error('Failed to persist Inside creds to backend:', err);
+    });
     if (fptCreds.username && fptCreds.password) {
       startFptShopAuth(fptCreds).catch(() => {});
       startLongChauAuth(fptCreds).catch(() => {});

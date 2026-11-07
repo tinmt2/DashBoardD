@@ -3,8 +3,9 @@ import json
 import logging
 import threading
 import time
-from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, List, Optional
+import calendar
+from datetime import datetime, timezone, timedelta, date
+from typing import Dict, Any, List, Optional, Tuple
 
 from app.core.database import SessionLocal
 from app.repositories.notification_repository import NotificationRepository
@@ -27,11 +28,48 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "interval_minutes": 15,
     "sync_chains": ["fpt_shop", "long_chau", "vaccine"],
     "date_range_days": 30,
+    "sync_mode": "current_month",
+    "specific_month": None,
     "last_run_at": None,
     "next_run_at": None,
     "last_status": None,
     "last_message": None,
 }
+
+
+def compute_sync_date_range(config: Dict[str, Any]) -> Tuple[date, date]:
+    today = datetime.now(timezone.utc).date()
+    mode = config.get("sync_mode", "current_month")
+
+    if mode == "current_month":
+        start_date = today.replace(day=1)
+        end_date = today
+        return start_date, end_date
+    elif mode == "specific_month":
+        specific = config.get("specific_month")
+        if specific and isinstance(specific, str) and "-" in specific:
+            try:
+                parts = specific.strip().split("-")
+                year = int(parts[0])
+                month = int(parts[1])
+                _, last_day = calendar.monthrange(year, month)
+                start_date = date(year, month, 1)
+                end_date = date(year, month, last_day)
+                if year == today.year and month == today.month:
+                    end_date = today
+                return start_date, end_date
+            except Exception as e:
+                logger.warning(f"[AUTO_SYNC] Invalid specific_month '{specific}': {e}. Falling back to current month.")
+        start_date = today.replace(day=1)
+        end_date = today
+        return start_date, end_date
+    elif mode == "days":
+        days = int(config.get("date_range_days", 30))
+        start_date = today - timedelta(days=days)
+        end_date = today
+        return start_date, end_date
+    else:
+        return today.replace(day=1), today
 
 
 class AutoSyncService:
@@ -129,6 +167,15 @@ class AutoSyncService:
             if "sync_chains" in new_cfg and isinstance(new_cfg["sync_chains"], list):
                 self.config["sync_chains"] = [str(c) for c in new_cfg["sync_chains"]]
 
+            if "sync_mode" in new_cfg:
+                mode = str(new_cfg["sync_mode"])
+                if mode in ["current_month", "specific_month", "days"]:
+                    self.config["sync_mode"] = mode
+
+            if "specific_month" in new_cfg:
+                val = new_cfg["specific_month"]
+                self.config["specific_month"] = str(val) if val else None
+
             if "date_range_days" in new_cfg:
                 days = int(new_cfg["date_range_days"])
                 self.config["date_range_days"] = max(1, min(days, 365))
@@ -209,9 +256,7 @@ class AutoSyncService:
         logger.info(f"[AUTO_SYNC] Starting sync execution (trigger={trigger_mode})...")
         db = SessionLocal()
         try:
-            days = self.config.get("date_range_days", 30)
-            end_date = datetime.now(timezone.utc).date()
-            start_date = end_date - timedelta(days=days)
+            start_date, end_date = compute_sync_date_range(self.config)
             start_str = start_date.strftime("%Y-%m-%d")
             end_str = end_date.strftime("%Y-%m-%d")
 

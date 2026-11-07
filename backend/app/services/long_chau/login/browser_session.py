@@ -1,3 +1,5 @@
+import json
+import time
 import threading
 import logging
 import urllib.parse
@@ -39,6 +41,44 @@ class LongChauBrowserSession(BaseBrowserSession):
             profile_name="fpt-sso-profile",
             start_url=settings.LONG_CHAU_LOGIN_URL
         )
+        self._load_session_from_disk()
+
+    def _get_session_path(self) -> str:
+        from app.core.config import BROWSER_DATA_DIR
+        return os.path.join(BROWSER_DATA_DIR, "long_chau_session.json")
+
+    def _save_session_to_disk(self):
+        try:
+            if not self.cached_cookies:
+                return
+            data = {
+                "cookies": self.cached_cookies,
+                "headers": self.cached_headers,
+                "saved_at": time.time()
+            }
+            with open(self._get_session_path(), "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            logger.info("Saved Long Chau session to disk.")
+        except Exception as e:
+            logger.warning(f"Could not save Long Chau session: {e}")
+
+    def _load_session_from_disk(self) -> bool:
+        try:
+            path = self._get_session_path()
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                cookies = data.get("cookies", {})
+                if any(k in cookies for k in ['budibase:auth', 'bb-auth']):
+                    self.cached_cookies = cookies
+                    self.cached_headers = data.get("headers") or {}
+                    self.status = "AUTHENTICATED"
+                    logger.info("Restored Long Chau session from disk.")
+                    return True
+        except Exception as e:
+            logger.warning(f"Could not load Long Chau session: {e}")
+        return False
+
 
     @classmethod
     def get_instance(cls):
@@ -54,6 +94,8 @@ class LongChauBrowserSession(BaseBrowserSession):
     def get_status(self) -> str:
         with self._lock:
             if self.driver is None:
+                if not self.cached_cookies:
+                    self._load_session_from_disk()
                 if self.status == "AUTHENTICATED" and self.cached_cookies and any(k in self.cached_cookies for k in ['budibase:auth', 'bb-auth']):
                     return self.status
                 if self.status != "ERROR":
@@ -191,6 +233,7 @@ class LongChauBrowserSession(BaseBrowserSession):
                             "x-budibase-app-id": self.get_app_id(),
                             "x-csrf-token": csrf_token if csrf_token else ""
                         }
+                        self._save_session_to_disk()
                         
                         def switch_headless():
                             try:

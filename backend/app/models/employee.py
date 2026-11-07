@@ -26,3 +26,29 @@ class EmployeeTransferHistory(Base):
     to_chain = Column(String, nullable=False)
     transferred_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     transferred_by = Column(String, nullable=True)
+
+class MonthlyScheduleLink(Base):
+    __tablename__ = "monthly_schedule_links"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    month = Column(String, unique=True, index=True, nullable=False)  # e.g. "2026-11"
+    title = Column(String, nullable=True)  # e.g. "Lịch làm việc Tháng 11/2026"
+    file_name = Column(String, nullable=True)  # e.g. "1. LLV T11 2026.xlsx"
+    sharepoint_url = Column(String, nullable=False)
+    note = Column(String, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+class EmployeeShift(Base):
+    __tablename__ = "employee_shifts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    month = Column(String, index=True, nullable=False)  # "2026-11"
+    employee_id = Column(String, index=True, nullable=False)  # "AnNT50", "LuanNV8"
+    employee_code = Column(String, nullable=True)  # "50407", "32690"
+    employee_name = Column(String, nullable=True)  # "Nguyễn Tấn An"
+    chain = Column(String, default="FPT Shop", index=True)  # "FPT Shop", "Long Châu", "Vaccine"
+    date = Column(String, index=True, nullable=False)  # "2026-11-23" (YYYY-MM-DD)
+    shift_type = Column(String, nullable=False)  # "Ca Sáng", "Ca Chiều", "Trực đêm", "Sáng + đêm", "OFF", etc.
+    day_of_week = Column(String, nullable=True)  # "Thứ 2", "Thứ 3"...
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

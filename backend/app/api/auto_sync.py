@@ -12,6 +12,8 @@ class AutoSyncConfigUpdate(BaseModel):
     interval_minutes: Optional[int] = Field(None, ge=5, le=1440)
     sync_chains: Optional[List[str]] = None
     date_range_days: Optional[int] = Field(None, ge=1, le=365)
+    sync_mode: Optional[str] = None
+    specific_month: Optional[str] = None
 
 
 @router.get("/config")

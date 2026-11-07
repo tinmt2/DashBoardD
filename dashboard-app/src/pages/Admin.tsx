@@ -103,11 +103,15 @@ const Admin: React.FC = () => {
     interval_minutes: number;
     sync_chains: string[];
     date_range_days: number;
+    sync_mode: 'current_month' | 'specific_month' | 'days';
+    specific_month: string;
   }>({
     enabled: true,
     interval_minutes: 15,
     sync_chains: ['fpt_shop', 'long_chau', 'vaccine'],
     date_range_days: 30,
+    sync_mode: 'current_month',
+    specific_month: `${new Date().getFullYear()}-${(new Date().getMonth() + 1).toString().padStart(2, '0')}`,
   });
   const [isSavingAutoSync, setIsSavingAutoSync] = useState(false);
   const [isTriggeringAutoSync, setIsTriggeringAutoSync] = useState(false);
@@ -252,6 +256,8 @@ const Admin: React.FC = () => {
         interval_minutes: cfg.interval_minutes,
         sync_chains: cfg.sync_chains,
         date_range_days: cfg.date_range_days,
+        sync_mode: cfg.sync_mode || 'current_month',
+        specific_month: cfg.specific_month || `${new Date().getFullYear()}-${(new Date().getMonth() + 1).toString().padStart(2, '0')}`,
       });
     } catch (err) {
       console.warn('Không thể tải cấu hình tự động đồng bộ:', err);
@@ -369,6 +375,8 @@ const Admin: React.FC = () => {
         interval_minutes: updated.interval_minutes,
         sync_chains: updated.sync_chains,
         date_range_days: updated.date_range_days,
+        sync_mode: updated.sync_mode || 'current_month',
+        specific_month: updated.specific_month || `${new Date().getFullYear()}-${(new Date().getMonth() + 1).toString().padStart(2, '0')}`,
       });
       setAutoSyncFeedback({
         type: 'success',
@@ -616,6 +624,8 @@ const Admin: React.FC = () => {
     autoSyncForm.enabled !== autoSyncConfig.enabled ||
     autoSyncForm.interval_minutes !== autoSyncConfig.interval_minutes ||
     autoSyncForm.date_range_days !== autoSyncConfig.date_range_days ||
+    autoSyncForm.sync_mode !== (autoSyncConfig.sync_mode || 'current_month') ||
+    autoSyncForm.specific_month !== (autoSyncConfig.specific_month || `${new Date().getFullYear()}-${(new Date().getMonth() + 1).toString().padStart(2, '0')}`) ||
     JSON.stringify(autoSyncForm.sync_chains.slice().sort()) !== JSON.stringify(autoSyncConfig.sync_chains.slice().sort())
   ));
 
@@ -814,19 +824,77 @@ const Admin: React.FC = () => {
                   <span className="text-[10px] text-slate-500 mt-1 block">Bấm nhanh: 15p, 30p, 60p, 120p hoặc tự nhập số</span>
                 </div>
 
-                <div>
+                <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-300 block mb-1">
-                    Số ngày quét gần nhất
+                    Phạm vi quét dữ liệu (Theo tháng / Ngày)
                   </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={90}
-                    value={autoSyncForm.date_range_days}
-                    onChange={(e) => setAutoSyncForm(prev => ({ ...prev, date_range_days: Number(e.target.value) }))}
-                    className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white text-xs font-mono focus:outline-none focus:border-indigo-500"
-                  />
-                  <span className="text-[10px] text-slate-500 mt-1 block">Mặc định: 30 ngày gần đây</span>
+                  <div className="grid grid-cols-3 gap-1 p-1 bg-slate-900 border border-slate-800 rounded-lg">
+                    <button
+                      type="button"
+                      onClick={() => setAutoSyncForm(prev => ({ ...prev, sync_mode: 'current_month' }))}
+                      className={`px-2 py-1.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
+                        autoSyncForm.sync_mode === 'current_month'
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      Tháng hiện tại
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAutoSyncForm(prev => ({ ...prev, sync_mode: 'specific_month' }))}
+                      className={`px-2 py-1.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
+                        autoSyncForm.sync_mode === 'specific_month'
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      Tháng cụ thể
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAutoSyncForm(prev => ({ ...prev, sync_mode: 'days' }))}
+                      className={`px-2 py-1.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
+                        autoSyncForm.sync_mode === 'days'
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      Số ngày
+                    </button>
+                  </div>
+
+                  {autoSyncForm.sync_mode === 'current_month' && (
+                    <div className="p-2 bg-indigo-950/40 border border-indigo-900/40 rounded-lg text-[10.5px] text-indigo-300">
+                      Tự động quét từ <b>01/{new Date().getMonth() + 1}/{new Date().getFullYear()}</b> đến hôm nay (tự co giãn theo tháng 28, 30, 31 ngày).
+                    </div>
+                  )}
+
+                  {autoSyncForm.sync_mode === 'specific_month' && (
+                    <div className="space-y-1">
+                      <input
+                        type="month"
+                        value={autoSyncForm.specific_month}
+                        onChange={(e) => setAutoSyncForm(prev => ({ ...prev, specific_month: e.target.value }))}
+                        className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white text-xs font-mono focus:outline-none focus:border-indigo-500"
+                      />
+                      <span className="text-[10px] text-slate-500 block">Quét toàn bộ từ ngày 01 đến cuối tháng {autoSyncForm.specific_month}</span>
+                    </div>
+                  )}
+
+                  {autoSyncForm.sync_mode === 'days' && (
+                    <div className="space-y-1">
+                      <input
+                        type="number"
+                        min={1}
+                        max={90}
+                        value={autoSyncForm.date_range_days}
+                        onChange={(e) => setAutoSyncForm(prev => ({ ...prev, date_range_days: Number(e.target.value) }))}
+                        className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white text-xs font-mono focus:outline-none focus:border-indigo-500"
+                      />
+                      <span className="text-[10px] text-slate-500 block">Lùi {autoSyncForm.date_range_days} ngày tính từ hôm nay</span>
+                    </div>
+                  )}
                 </div>
               </div>
 

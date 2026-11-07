@@ -12,6 +12,7 @@ class Employee(Base):
     position = Column(String, nullable=True)
     status = Column(String, nullable=False, default="Active", index=True)
     start_date = Column(String, nullable=True)
+    note = Column(String, nullable=True)  # Thay đổi / Ghi chú
     total_errors = Column(Integer, default=0)
     total_checked = Column(Integer, default=0)
     last_activity = Column(String, nullable=True)

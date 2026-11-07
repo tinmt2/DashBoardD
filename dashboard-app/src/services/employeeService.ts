@@ -145,7 +145,8 @@ export const EmployeeService = {
           chain: employee.chain,
           position: employee.position,
           status: employee.status,
-          startDate: employee.startDate
+          startDate: employee.startDate,
+          note: employee.note
         })
       });
       if (!res.ok) {
@@ -179,6 +180,24 @@ export const EmployeeService = {
 
       saveEmployees(employees);
       return employees[index];
+    }
+  },
+
+  updateNote: async (id: string, note: string): Promise<void> => {
+    try {
+      await fetch(`${API_BASE_URL}/api/employees/${encodeURIComponent(id)}/note`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note })
+      });
+    } catch (err: any) {
+      console.warn("Backend updateNote failed, updating locally", err);
+    }
+    const employees = getStoredEmployees();
+    const idx = employees.findIndex(e => e.id === id);
+    if (idx !== -1) {
+      employees[idx] = { ...employees[idx], note };
+      saveEmployees(employees);
     }
   },
 

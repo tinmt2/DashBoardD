@@ -1,12 +1,77 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, Plus, Edit2, MoveRight, ShieldAlert, X } from 'lucide-react';
+import { Search, Plus, Edit2, MoveRight, ShieldAlert, X, Check } from 'lucide-react';
 import { EmployeeService } from '../services/employeeService';
 import type { Employee, Chain } from '../types';
 import { GlassCard } from '../components/common/GlassCard';
 import { useSidebar } from '../components/layout/Layout';
 
 const CHAINS: Chain[] = ['FPT Shop', 'Long Châu', 'Vaccine'];
+
+
+interface EmployeeNoteCellProps {
+  employeeId: string;
+  initialNote?: string;
+  onSaved?: (newNote: string) => void;
+}
+
+const EmployeeNoteCell: React.FC<EmployeeNoteCellProps> = ({ employeeId, initialNote = '', onSaved }) => {
+  const [note, setNote] = useState(initialNote || '');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+
+  useEffect(() => {
+    setNote(initialNote || '');
+  }, [initialNote]);
+
+  const handleSave = async () => {
+    const trimmed = note.trim();
+    if (trimmed === (initialNote || '').trim()) return;
+    setIsSaving(true);
+    try {
+      await EmployeeService.updateNote(employeeId, trimmed);
+      setIsSaved(true);
+      onSaved?.(trimmed);
+      setTimeout(() => setIsSaved(false), 2000);
+    } catch (e) {
+      console.error("Lỗi khi lưu ghi chú nhân viên:", e);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="relative flex items-center w-full min-w-[190px] max-w-[280px]">
+      <input
+        type="text"
+        value={note}
+        onChange={e => {
+          setNote(e.target.value);
+          setIsSaved(false);
+        }}
+        onBlur={handleSave}
+        onKeyDown={e => {
+          if (e.key === 'Enter') {
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+        placeholder="Ghi chú thay đổi..."
+        title="Nhập ghi chú thay đổi (tự động lưu khi bấm ra ngoài hoặc nhấn Enter)"
+        className={`w-full pl-3 pr-8 py-1.5 text-[13px] rounded-lg border transition-all outline-none text-slate-800 placeholder:text-slate-400 ${
+          isSaved 
+            ? 'border-emerald-400 bg-emerald-50/40 text-emerald-900 font-medium' 
+            : 'border-slate-200 bg-white hover:border-slate-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 shadow-2xs'
+        }`}
+      />
+      {isSaving && (
+        <span className="absolute right-2.5 text-[10px] text-slate-400 font-semibold select-none animate-pulse">Lưu...</span>
+      )}
+      {isSaved && !isSaving && (
+        <Check className="w-3.5 h-3.5 text-emerald-600 absolute right-2.5 pointer-events-none transition-opacity" />
+      )}
+    </div>
+  );
+};
 
 const Employees: React.FC = () => {
   const { isCollapsed } = useSidebar();
@@ -16,8 +81,7 @@ const Employees: React.FC = () => {
   // Filters
   const [search, setSearch] = useState('');
   const [chainFilter, setChainFilter] = useState<Chain | 'All'>('All');
-  const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Inactive'>('All');
-  const [sortBy, setSortBy] = useState<'insideCode' | 'name' | 'id' | 'chain' | 'status' | 'startDate'>('insideCode');
+  const [sortBy, setSortBy] = useState<'insideCode' | 'name' | 'id' | 'chain' | 'startDate'>('insideCode');
   
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -34,7 +98,8 @@ const Employees: React.FC = () => {
     chain: 'FPT Shop' as Chain,
     position: '',
     status: 'Active' as 'Active' | 'Inactive',
-    startDate: ''
+    startDate: '',
+    note: ''
   });
   const [formError, setFormError] = useState('');
   const [moveTarget, setMoveTarget] = useState<Chain>('FPT Shop');
@@ -61,13 +126,13 @@ const Employees: React.FC = () => {
 
   const filteredEmployees = employees.filter(emp => {
     if (chainFilter !== 'All' && emp.chain !== chainFilter) return false;
-    if (statusFilter !== 'All' && emp.status !== statusFilter) return false;
     if (search) {
       const q = search.toLowerCase();
       const matchName = emp.name.toLowerCase().includes(q);
       const matchId = emp.id.toLowerCase().includes(q);
       const matchInside = (emp.insideCode || '').toLowerCase().includes(q);
-      if (!matchName && !matchId && !matchInside) return false;
+      const matchNote = (emp.note || '').toLowerCase().includes(q);
+      if (!matchName && !matchId && !matchInside && !matchNote) return false;
     }
     return true;
   }).sort((a, b) => {
@@ -82,7 +147,6 @@ const Employees: React.FC = () => {
     if (sortBy === 'name') return a.name.localeCompare(b.name);
     if (sortBy === 'id') return a.id.localeCompare(b.id);
     if (sortBy === 'chain') return a.chain.localeCompare(b.chain);
-    if (sortBy === 'status') return a.status.localeCompare(b.status);
     if (sortBy === 'startDate') return (a.startDate || '').localeCompare(b.startDate || '');
     return 0;
   });
@@ -106,7 +170,7 @@ const Employees: React.FC = () => {
       const newEmp = await EmployeeService.createEmployee(formData);
       setEmployees(prev => [newEmp, ...prev]);
       setIsAddModalOpen(false);
-      setFormData({ id: '', insideCode: '', name: '', chain: 'FPT Shop', position: '', status: 'Active', startDate: '' });
+      setFormData({ id: '', insideCode: '', name: '', chain: 'FPT Shop', position: '', status: 'Active', startDate: '', note: '' });
     } catch (err: any) {
       setFormError(err.message || 'Lỗi khi thêm nhân viên');
     }
@@ -122,7 +186,8 @@ const Employees: React.FC = () => {
         name: formData.name, 
         position: formData.position, 
         status: formData.status, 
-        startDate: formData.startDate
+        startDate: formData.startDate,
+        note: formData.note
       });
       updateLocalEmployee(updated);
       setIsEditModalOpen(false);
@@ -219,15 +284,7 @@ const Employees: React.FC = () => {
           <option value="Vaccine">Vaccine</option>
         </select>
         
-        <select 
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value as any)}
-          className="px-3.5 py-2 rounded-[12px] border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-[13.5px] font-medium"
-        >
-          <option value="All">Tất cả trạng thái</option>
-          <option value="Active">Đang làm việc</option>
-          <option value="Inactive">Đã nghỉ việc</option>
-        </select>
+
 
         <select 
           value={sortBy}
@@ -266,17 +323,18 @@ const Employees: React.FC = () => {
                 <th className="px-6 py-4 text-[13px] font-bold text-slate-500 uppercase tracking-wider">Họ và tên</th>
                 <th className="px-6 py-4 text-[13px] font-bold text-slate-500 uppercase tracking-wider">Chuỗi</th>
                 <th className="px-6 py-4 text-[13px] font-bold text-slate-500 uppercase tracking-wider">Thâm niên</th>
+                <th className="px-6 py-4 text-[13px] font-bold text-slate-500 uppercase tracking-wider min-w-[200px]">Thay đổi</th>
                 <th className="px-6 py-4 text-[13px] font-bold text-slate-500 uppercase tracking-wider text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-slate-500 font-medium">Đang tải danh sách nhân viên...</td>
+                  <td colSpan={7} className="px-6 py-8 text-center text-slate-500 font-medium">Đang tải danh sách nhân viên...</td>
                 </tr>
               ) : filteredEmployees.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-slate-500 font-medium">Không tìm thấy nhân viên phù hợp</td>
+                  <td colSpan={7} className="px-6 py-8 text-center text-slate-500 font-medium">Không tìm thấy nhân viên phù hợp</td>
                 </tr>
               ) : (
                 filteredEmployees.map((emp) => (
@@ -298,6 +356,15 @@ const Employees: React.FC = () => {
                     <td className="px-6 py-4 text-[14px] font-medium text-slate-600">
                       {emp.startDate ? Math.max(0, Math.floor((Date.now() - new Date(emp.startDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44))) + ' tháng' : '-'}
                     </td>
+                    <td className="px-6 py-3">
+                      <EmployeeNoteCell
+                        employeeId={emp.id}
+                        initialNote={emp.note}
+                        onSaved={(newNote) => {
+                          setEmployees(prev => prev.map(e => e.id === emp.id ? { ...e, note: newNote } : e));
+                        }}
+                      />
+                    </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
                         <button
@@ -309,7 +376,8 @@ const Employees: React.FC = () => {
                               name: emp.name, 
                               position: emp.position || '', 
                               status: emp.status, 
-                              startDate: emp.startDate || ''
+                              startDate: emp.startDate || '',
+                              note: emp.note || ''
                             }); 
                             setIsEditModalOpen(true); 
                           }}
@@ -381,6 +449,10 @@ const Employees: React.FC = () => {
                 <label className="block text-[13px] font-bold text-slate-700 mb-1">Ngày bắt đầu</label>
                 <input type="date" value={formData.startDate || ''} onChange={e => setFormData({...formData, startDate: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500/50 outline-none"/>
               </div>
+              <div>
+                <label className="block text-[13px] font-bold text-slate-700 mb-1">Thay đổi / Ghi chú</label>
+                <input type="text" placeholder="Nhập ghi chú thay đổi nếu có..." value={formData.note} onChange={e => setFormData({...formData, note: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500/50 outline-none"/>
+              </div>
               
               <div className="flex gap-3 justify-end mt-8">
                 <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-5 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer">Hủy</button>
@@ -444,6 +516,10 @@ const Employees: React.FC = () => {
                 <div>
                   <label className="block text-[13px] font-bold text-slate-700 mb-1">Ngày bắt đầu</label>
                   <input type="date" value={formData.startDate || ''} onChange={e => setFormData({...formData, startDate: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500/50 outline-none"/>
+                </div>
+                <div>
+                  <label className="block text-[13px] font-bold text-slate-700 mb-1">Thay đổi / Ghi chú</label>
+                  <input type="text" placeholder="Nhập ghi chú thay đổi..." value={formData.note} onChange={e => setFormData({...formData, note: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500/50 outline-none"/>
                 </div>
                 <div className="flex gap-3 justify-between mt-8">
                   <button

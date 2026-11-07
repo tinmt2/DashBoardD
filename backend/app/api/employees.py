@@ -76,6 +76,7 @@ def serialize_employee(e: Employee) -> dict:
         "position": e.position or "",
         "status": e.status,
         "startDate": e.start_date or "",
+        "note": e.note or "",
         "totalErrors": e.total_errors or 0,
         "totalChecked": e.total_checked or 0,
         "lastActivity": e.last_activity or "",
@@ -100,6 +101,7 @@ class EmployeeCreateRequest(BaseModel):
     position: Optional[str] = ""
     status: Optional[str] = "Active"
     startDate: Optional[str] = ""
+    note: Optional[str] = ""
 
 class EmployeeUpdateRequest(BaseModel):
     insideCode: Optional[str] = None
@@ -108,6 +110,7 @@ class EmployeeUpdateRequest(BaseModel):
     position: Optional[str] = None
     status: Optional[str] = None
     startDate: Optional[str] = None
+    note: Optional[str] = None
 
 class MoveEmployeeRequest(BaseModel):
     targetChain: str
@@ -136,6 +139,7 @@ def create_employee(req: EmployeeCreateRequest, db: Session = Depends(get_db)):
         position=req.position,
         status=req.status or "Active",
         start_date=req.startDate,
+        note=(req.note or "").strip(),
         total_errors=0,
         total_checked=0
     )
@@ -162,11 +166,28 @@ def update_employee(emp_id: str, req: EmployeeUpdateRequest, db: Session = Depen
         emp.status = req.status
     if req.startDate is not None:
         emp.start_date = req.startDate
+    if req.note is not None:
+        emp.note = req.note.strip()
     
     emp.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(emp)
     return serialize_employee(emp)
+
+
+class EmployeeNoteRequest(BaseModel):
+    note: str
+
+@router.patch("/{emp_id}/note")
+def update_employee_note(emp_id: str, req: EmployeeNoteRequest, db: Session = Depends(get_db)):
+    emp = db.query(Employee).filter(Employee.id == emp_id).first()
+    if not emp:
+        raise HTTPException(status_code=404, detail="Không tìm thấy nhân viên!")
+    emp.note = req.note.strip()
+    emp.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(emp)
+    return {"success": True, "id": emp.id, "note": emp.note}
 
 @router.post("/{emp_id}/move")
 def move_employee(emp_id: str, req: MoveEmployeeRequest, db: Session = Depends(get_db)):

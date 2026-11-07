@@ -32,6 +32,7 @@ export interface Employee {
   
   position?: string;
   startDate?: string;
+  note?: string;
   createdAt?: string;
   updatedAt?: string;
 }

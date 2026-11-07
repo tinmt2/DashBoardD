@@ -73,6 +73,7 @@ def serialize_employee(e: Employee) -> dict:
         "insideCode": e.inside_code or "",
         "name": e.name,
         "chain": e.chain,
+        "insideChain": e.inside_chain or e.chain,
         "position": e.position or "",
         "status": e.status,
         "startDate": e.start_date or "",
@@ -98,6 +99,7 @@ class EmployeeCreateRequest(BaseModel):
     insideCode: Optional[str] = ""
     name: str
     chain: str
+    insideChain: Optional[str] = None
     position: Optional[str] = ""
     status: Optional[str] = "Active"
     startDate: Optional[str] = ""
@@ -107,6 +109,7 @@ class EmployeeUpdateRequest(BaseModel):
     insideCode: Optional[str] = None
     name: Optional[str] = None
     chain: Optional[str] = None
+    insideChain: Optional[str] = None
     position: Optional[str] = None
     status: Optional[str] = None
     startDate: Optional[str] = None
@@ -136,6 +139,7 @@ def create_employee(req: EmployeeCreateRequest, db: Session = Depends(get_db)):
         inside_code=(req.insideCode or "").strip(),
         name=req.name.strip(),
         chain=req.chain,
+        inside_chain=(req.insideChain or req.chain or "").strip(),
         position=req.position,
         status=req.status or "Active",
         start_date=req.startDate,
@@ -160,6 +164,8 @@ def update_employee(emp_id: str, req: EmployeeUpdateRequest, db: Session = Depen
         emp.name = req.name.strip()
     if req.chain is not None:
         emp.chain = req.chain
+    if req.insideChain is not None:
+        emp.inside_chain = req.insideChain.strip() or None
     if req.position is not None:
         emp.position = req.position
     if req.status is not None:
@@ -188,6 +194,20 @@ def update_employee_note(emp_id: str, req: EmployeeNoteRequest, db: Session = De
     db.commit()
     db.refresh(emp)
     return {"success": True, "id": emp.id, "note": emp.note}
+
+class EmployeeInsideChainRequest(BaseModel):
+    insideChain: str
+
+@router.patch("/{emp_id}/inside-chain")
+def update_employee_inside_chain(emp_id: str, req: EmployeeInsideChainRequest, db: Session = Depends(get_db)):
+    emp = db.query(Employee).filter(Employee.id == emp_id).first()
+    if not emp:
+        raise HTTPException(status_code=404, detail="Không tìm thấy nhân viên!")
+    emp.inside_chain = req.insideChain.strip() or None
+    emp.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(emp)
+    return {"success": True, "id": emp.id, "insideChain": emp.inside_chain}
 
 @router.post("/{emp_id}/move")
 def move_employee(emp_id: str, req: MoveEmployeeRequest, db: Session = Depends(get_db)):

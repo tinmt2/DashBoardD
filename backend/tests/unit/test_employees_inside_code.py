@@ -41,3 +41,23 @@ def test_employee_note_update_persistence():
     clean_res = client.patch("/api/employees/VienND2/note", json={"note": ""})
     assert clean_res.status_code == 200
 
+
+def test_employee_inside_chain_update_persistence():
+    # Update insideChain for VienND2
+    patch_res = client.patch("/api/employees/VienND2/inside-chain", json={"insideChain": "Vaccine"})
+    assert patch_res.status_code == 200
+    res_data = patch_res.json()
+    assert res_data["success"] is True
+    assert res_data["insideChain"] == "Vaccine"
+
+    # Verify GET returns updated insideChain
+    get_res = client.get("/api/employees")
+    assert get_res.status_code == 200
+    all_emps = get_res.json()
+    vien = next((e for e in all_emps if e["id"] == "VienND2"), None)
+    assert vien is not None
+    assert vien["insideChain"] == "Vaccine"
+
+    # Revert back to FPT Shop
+    revert_res = client.patch("/api/employees/VienND2/inside-chain", json={"insideChain": "FPT Shop"})
+    assert revert_res.status_code == 200

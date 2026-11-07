@@ -21,6 +21,7 @@ export interface Employee {
   insideCode?: string; // Mã Inside (e.g. 51765)
   name: string;
   chain: Chain;
+  insideChain?: Chain | string;
   status: 'Active' | 'Inactive';
   
   /** Tổng số lỗi Calllog/Ticket */

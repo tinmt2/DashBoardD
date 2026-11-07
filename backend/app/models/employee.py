@@ -9,6 +9,7 @@ class Employee(Base):
     inside_code = Column(String, nullable=True, index=True)  # Mã Inside (e.g. "51765")
     name = Column(String, nullable=False, index=True)
     chain = Column(String, nullable=False, default="FPT Shop", index=True)
+    inside_chain = Column(String, nullable=True)  # Chuỗi theo mã Inside
     position = Column(String, nullable=True)
     status = Column(String, nullable=False, default="Active", index=True)
     start_date = Column(String, nullable=True)

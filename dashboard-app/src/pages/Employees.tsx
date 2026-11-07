@@ -39,7 +39,7 @@ const EmployeeNoteCell: React.FC<EmployeeNoteCellProps> = ({ employeeId, initial
   };
 
   return (
-    <div className="relative flex items-center w-full min-w-[100px]">
+    <div className="relative flex items-center w-full min-w-[95px]">
       <input
         type="text"
         value={note}
@@ -77,6 +77,7 @@ interface CompactEmployeeTableProps {
   onEdit: (emp: Employee) => void;
   onMove: (emp: Employee) => void;
   onSaveNote: (id: string, note: string) => void;
+  onSaveInsideChain: (id: string, insideChain: Chain) => void;
   loading?: boolean;
   emptyText?: string;
 }
@@ -87,10 +88,11 @@ const CompactEmployeeTable: React.FC<CompactEmployeeTableProps> = ({
   onEdit,
   onMove,
   onSaveNote,
+  onSaveInsideChain,
   loading = false,
   emptyText = 'Không tìm thấy nhân viên'
 }) => {
-  const colSpanCount = showChainColumn ? 7 : 6;
+  const colSpanCount = showChainColumn ? 8 : 7;
 
   return (
     <div className="overflow-x-auto w-full">
@@ -100,9 +102,10 @@ const CompactEmployeeTable: React.FC<CompactEmployeeTableProps> = ({
             <th className="px-2.5 py-1.5 whitespace-nowrap">Mã</th>
             <th className="px-2 py-1.5 whitespace-nowrap">Mail</th>
             <th className="px-2 py-1.5 whitespace-nowrap">Họ và tên</th>
-            {showChainColumn && <th className="px-2 py-1.5 whitespace-nowrap">Chuỗi</th>}
+            <th className="px-2 py-1.5 whitespace-nowrap" title="Chuỗi theo mã Inside (có thể chọn)">Chuỗi Inside</th>
+            {showChainColumn && <th className="px-2 py-1.5 whitespace-nowrap" title="Chuỗi giám sát hiện tại">Chuỗi GS</th>}
             <th className="px-1.5 py-1.5 whitespace-nowrap text-center">TN</th>
-            <th className="px-2 py-1.5 min-w-[110px]">Thay đổi</th>
+            <th className="px-2 py-1.5 min-w-[100px]">Thay đổi</th>
             <th className="px-2 py-1.5 text-right whitespace-nowrap">Thao tác</th>
           </tr>
         </thead>
@@ -124,6 +127,8 @@ const CompactEmployeeTable: React.FC<CompactEmployeeTableProps> = ({
               const months = emp.startDate 
                 ? Math.max(0, Math.floor((Date.now() - new Date(emp.startDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44)))
                 : null;
+              
+              const currentInsideChain = (emp.insideChain as Chain) || emp.chain;
 
               return (
                 <tr key={emp.id} className="hover:bg-blue-50/30 transition-colors h-[28px] sm:h-[30px]">
@@ -133,9 +138,30 @@ const CompactEmployeeTable: React.FC<CompactEmployeeTableProps> = ({
                   <td className="px-2 py-0.5 font-bold text-slate-900 whitespace-nowrap">
                     {emp.id}
                   </td>
-                  <td className="px-2 py-0.5 font-medium text-slate-800 truncate max-w-[125px]" title={emp.name}>
+                  <td className="px-2 py-0.5 font-medium text-slate-800 truncate max-w-[120px]" title={emp.name}>
                     {emp.name}
                   </td>
+                  
+                  {/* Cột Chuỗi Inside: Đặt ngay sau Họ và tên, hiển thị chuỗi do người dùng chọn */}
+                  <td className="px-2 py-0.5 whitespace-nowrap">
+                    <select
+                      value={currentInsideChain}
+                      onChange={(e) => onSaveInsideChain(emp.id, e.target.value as Chain)}
+                      className={`px-1.5 py-0.5 rounded text-[10.5px] font-bold border transition-all cursor-pointer outline-none ${
+                        currentInsideChain === 'FPT Shop' 
+                          ? 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100' :
+                        currentInsideChain === 'Long Châu' 
+                          ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' :
+                          'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
+                      }`}
+                      title="Chuỗi theo mã Inside (Bấm để thay đổi, hệ thống sẽ tự động lưu)"
+                    >
+                      <option value="FPT Shop">FPT Shop</option>
+                      <option value="Long Châu">Long Châu</option>
+                      <option value="Vaccine">Vaccine</option>
+                    </select>
+                  </td>
+
                   {showChainColumn && (
                     <td className="px-2 py-0.5 whitespace-nowrap">
                       <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
@@ -172,7 +198,7 @@ const CompactEmployeeTable: React.FC<CompactEmployeeTableProps> = ({
                           type="button"
                           onClick={() => onMove(emp)}
                           className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors cursor-pointer"
-                          title="Chuyển chuỗi"
+                          title="Chuyển chuỗi giám sát"
                         >
                           <MoveRight className="w-3.5 h-3.5" />
                         </button>
@@ -206,7 +232,7 @@ const Employees: React.FC = () => {
   // Filters
   const [search, setSearch] = useState('');
   const [chainFilter, setChainFilter] = useState<Chain | 'All'>('All');
-  const [sortBy, setSortBy] = useState<'insideCode' | 'name' | 'id' | 'chain' | 'startDate'>('insideCode');
+  const [sortBy, setSortBy] = useState<'insideCode' | 'name' | 'id' | 'chain' | 'insideChain' | 'startDate'>('insideCode');
   
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -221,6 +247,7 @@ const Employees: React.FC = () => {
     insideCode: '',
     name: '',
     chain: 'FPT Shop' as Chain,
+    insideChain: 'FPT Shop' as Chain,
     position: '',
     status: 'Active' as 'Active' | 'Inactive',
     startDate: '',
@@ -253,6 +280,15 @@ const Employees: React.FC = () => {
     setEmployees(prev => prev.map(e => e.id === empId ? { ...e, note: newNote } : e));
   };
 
+  const handleSaveInsideChain = async (empId: string, newInsideChain: Chain) => {
+    setEmployees(prev => prev.map(e => e.id === empId ? { ...e, insideChain: newInsideChain } : e));
+    try {
+      await EmployeeService.updateInsideChain(empId, newInsideChain);
+    } catch (e) {
+      console.error("Lỗi khi cập nhật chuỗi Inside:", e);
+    }
+  };
+
   const openEditModal = (emp: Employee) => {
     setSelectedEmployee(emp); 
     setFormData({
@@ -260,6 +296,7 @@ const Employees: React.FC = () => {
       insideCode: emp.insideCode || '',
       name: emp.name, 
       chain: emp.chain,
+      insideChain: (emp.insideChain as Chain) || emp.chain,
       position: emp.position || '', 
       status: emp.status, 
       startDate: emp.startDate || '',
@@ -282,7 +319,8 @@ const Employees: React.FC = () => {
       const matchId = emp.id.toLowerCase().includes(q);
       const matchInside = (emp.insideCode || '').toLowerCase().includes(q);
       const matchNote = (emp.note || '').toLowerCase().includes(q);
-      if (!matchName && !matchId && !matchInside && !matchNote) return false;
+      const matchInsideChain = (emp.insideChain || '').toLowerCase().includes(q);
+      if (!matchName && !matchId && !matchInside && !matchNote && !matchInsideChain) return false;
     }
     return true;
   }).sort((a, b) => {
@@ -297,6 +335,11 @@ const Employees: React.FC = () => {
     if (sortBy === 'name') return a.name.localeCompare(b.name);
     if (sortBy === 'id') return a.id.localeCompare(b.id);
     if (sortBy === 'chain') return a.chain.localeCompare(b.chain);
+    if (sortBy === 'insideChain') {
+      const cA = (a.insideChain || a.chain);
+      const cB = (b.insideChain || b.chain);
+      return cA.localeCompare(cB);
+    }
     if (sortBy === 'startDate') return (a.startDate || '').localeCompare(b.startDate || '');
     return 0;
   });
@@ -309,7 +352,7 @@ const Employees: React.FC = () => {
     active: employees.filter(e => e.status === 'Active').length,
   };
 
-  // Groups for 3-Column By-Chain mode
+  // Groups for 3-Column By-Chain mode (grouped by monitoring chain)
   const fptEmps = filteredEmployees.filter(e => e.chain === 'FPT Shop');
   const longchauEmps = filteredEmployees.filter(e => e.chain === 'Long Châu');
   const vaccineEmps = filteredEmployees.filter(e => e.chain === 'Vaccine');
@@ -330,7 +373,17 @@ const Employees: React.FC = () => {
       const newEmp = await EmployeeService.createEmployee(formData);
       setEmployees(prev => [newEmp, ...prev]);
       setIsAddModalOpen(false);
-      setFormData({ id: '', insideCode: '', name: '', chain: 'FPT Shop', position: '', status: 'Active', startDate: '', note: '' });
+      setFormData({ 
+        id: '', 
+        insideCode: '', 
+        name: '', 
+        chain: 'FPT Shop', 
+        insideChain: 'FPT Shop', 
+        position: '', 
+        status: 'Active', 
+        startDate: '', 
+        note: '' 
+      });
     } catch (err: any) {
       setFormError(err.message || 'Lỗi khi thêm nhân viên');
     }
@@ -344,6 +397,7 @@ const Employees: React.FC = () => {
         ...selectedEmployee,
         insideCode: formData.insideCode,
         name: formData.name, 
+        insideChain: formData.insideChain,
         position: formData.position, 
         status: formData.status, 
         startDate: formData.startDate,
@@ -452,7 +506,7 @@ const Employees: React.FC = () => {
           <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input 
             type="text" 
-            placeholder="Tìm Mã Inside, Mail, họ tên, note..." 
+            placeholder="Tìm Mã Inside, Mail, họ tên, chuỗi, note..." 
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-8 pr-3 py-1 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-[12.5px]"
@@ -464,10 +518,10 @@ const Employees: React.FC = () => {
           onChange={e => setChainFilter(e.target.value as any)}
           className="px-2.5 py-1 rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-[12px] font-medium"
         >
-          <option value="All">Tất cả chuỗi</option>
-          <option value="FPT Shop">FPT Shop</option>
-          <option value="Long Châu">Long Châu</option>
-          <option value="Vaccine">Vaccine</option>
+          <option value="All">Tất cả chuỗi giám sát</option>
+          <option value="FPT Shop">GS: FPT Shop</option>
+          <option value="Long Châu">GS: Long Châu</option>
+          <option value="Vaccine">GS: Vaccine</option>
         </select>
 
         <select 
@@ -478,7 +532,8 @@ const Employees: React.FC = () => {
           <option value="insideCode">Xếp: Mã Inside</option>
           <option value="id">Xếp: Mail</option>
           <option value="name">Xếp: Tên</option>
-          <option value="chain">Xếp: Chuỗi</option>
+          <option value="insideChain">Xếp: Chuỗi Inside</option>
+          <option value="chain">Xếp: Chuỗi giám sát</option>
           <option value="startDate">Xếp: Ngày bắt đầu</option>
         </select>
 
@@ -492,7 +547,7 @@ const Employees: React.FC = () => {
                 ? 'bg-white text-slate-900 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
-            title="Song song 3 chuỗi (Hiển thị toàn bộ 38 nhân viên trên 1 màn hình không scroll)"
+            title="Song song 3 chuỗi giám sát (Hiển thị toàn bộ 38 nhân viên trên 1 màn hình không scroll)"
           >
             <LayoutGrid className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">3 Chuỗi</span>
@@ -547,6 +602,7 @@ const Employees: React.FC = () => {
               onEdit={openEditModal}
               onMove={openMoveModal}
               onSaveNote={handleSaveNote}
+              onSaveInsideChain={handleSaveInsideChain}
               loading={loading}
               emptyText="Không có nhân viên FPT Shop"
             />
@@ -569,6 +625,7 @@ const Employees: React.FC = () => {
               onEdit={openEditModal}
               onMove={openMoveModal}
               onSaveNote={handleSaveNote}
+              onSaveInsideChain={handleSaveInsideChain}
               loading={loading}
               emptyText="Không có nhân viên Long Châu"
             />
@@ -591,6 +648,7 @@ const Employees: React.FC = () => {
               onEdit={openEditModal}
               onMove={openMoveModal}
               onSaveNote={handleSaveNote}
+              onSaveInsideChain={handleSaveInsideChain}
               loading={loading}
               emptyText="Không có nhân viên Vaccine"
             />
@@ -606,6 +664,7 @@ const Employees: React.FC = () => {
               onEdit={openEditModal}
               onMove={openMoveModal}
               onSaveNote={handleSaveNote}
+              onSaveInsideChain={handleSaveInsideChain}
               loading={loading}
             />
           </div>
@@ -616,6 +675,7 @@ const Employees: React.FC = () => {
               onEdit={openEditModal}
               onMove={openMoveModal}
               onSaveNote={handleSaveNote}
+              onSaveInsideChain={handleSaveInsideChain}
               loading={loading}
             />
           </div>
@@ -629,6 +689,7 @@ const Employees: React.FC = () => {
             onEdit={openEditModal}
             onMove={openMoveModal}
             onSaveNote={handleSaveNote}
+            onSaveInsideChain={handleSaveInsideChain}
             loading={loading}
           />
         </GlassCard>
@@ -664,12 +725,22 @@ const Employees: React.FC = () => {
                 <label className="block text-[13px] font-bold text-slate-700 mb-1">Họ và tên *</label>
                 <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500/50 outline-none"/>
               </div>
-              <div>
-                <label className="block text-[13px] font-bold text-slate-700 mb-1">Chuỗi *</label>
-                <select required value={formData.chain} onChange={e => setFormData({...formData, chain: e.target.value as Chain})} className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500/50 outline-none">
-                  {CHAINS.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[13px] font-bold text-slate-700 mb-1">Chuỗi giám sát *</label>
+                  <select required value={formData.chain} onChange={e => setFormData({...formData, chain: e.target.value as Chain})} className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500/50 outline-none">
+                    {CHAINS.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[13px] font-bold text-slate-700 mb-1">Chuỗi Inside *</label>
+                  <select required value={formData.insideChain} onChange={e => setFormData({...formData, insideChain: e.target.value as Chain})} className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500/50 outline-none">
+                    {CHAINS.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
               </div>
+
               <div>
                 <label className="block text-[13px] font-bold text-slate-700 mb-1">Ngày bắt đầu</label>
                 <input type="date" value={formData.startDate || ''} onChange={e => setFormData({...formData, startDate: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500/50 outline-none"/>
@@ -738,6 +809,14 @@ const Employees: React.FC = () => {
                   <label className="block text-[13px] font-bold text-slate-700 mb-1">Họ và tên *</label>
                   <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500/50 outline-none"/>
                 </div>
+
+                <div>
+                  <label className="block text-[13px] font-bold text-slate-700 mb-1">Chuỗi Inside (Theo mã Inside)</label>
+                  <select value={formData.insideChain} onChange={e => setFormData({...formData, insideChain: e.target.value as Chain})} className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500/50 outline-none">
+                    {CHAINS.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+
                 <div>
                   <label className="block text-[13px] font-bold text-slate-700 mb-1">Ngày bắt đầu</label>
                   <input type="date" value={formData.startDate || ''} onChange={e => setFormData({...formData, startDate: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500/50 outline-none"/>
@@ -770,7 +849,7 @@ const Employees: React.FC = () => {
       {isMoveModalOpen && selectedEmployee && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-[24px] p-8 w-full max-w-md shadow-2xl">
-            <h2 className="text-xl font-bold text-slate-900 mb-6">CHUYỂN CHUỖI</h2>
+            <h2 className="text-xl font-bold text-slate-900 mb-6">CHUYỂN CHUỖI GIÁM SÁT</h2>
             
             <div className="space-y-4 mb-6">
               <div className="flex justify-between items-center border-b border-slate-100 pb-3">
@@ -778,11 +857,15 @@ const Employees: React.FC = () => {
                 <span className="font-bold text-slate-900">{selectedEmployee.name} ({selectedEmployee.id})</span>
               </div>
               <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                <span className="text-slate-500 font-medium">Chuỗi hiện tại:</span>
+                <span className="text-slate-500 font-medium">Chuỗi giám sát hiện tại:</span>
                 <span className="font-bold text-slate-900">{selectedEmployee.chain}</span>
               </div>
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                <span className="text-slate-500 font-medium">Chuỗi Inside:</span>
+                <span className="font-bold text-slate-900">{selectedEmployee.insideChain || selectedEmployee.chain}</span>
+              </div>
               <div>
-                <label className="block text-slate-500 font-medium mb-2">Chuyển sang chuỗi mới:</label>
+                <label className="block text-slate-500 font-medium mb-2">Chuyển sang chuỗi giám sát mới:</label>
                 <div className="grid grid-cols-2 gap-2">
                   {CHAINS.filter(c => c !== selectedEmployee.chain).map(c => (
                     <button

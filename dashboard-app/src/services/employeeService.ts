@@ -146,7 +146,8 @@ export const EmployeeService = {
           position: employee.position,
           status: employee.status,
           startDate: employee.startDate,
-          note: employee.note
+          note: employee.note,
+          insideChain: employee.insideChain
         })
       });
       if (!res.ok) {
@@ -197,6 +198,24 @@ export const EmployeeService = {
     const idx = employees.findIndex(e => e.id === id);
     if (idx !== -1) {
       employees[idx] = { ...employees[idx], note };
+      saveEmployees(employees);
+    }
+  },
+
+  updateInsideChain: async (id: string, insideChain: Chain | string): Promise<void> => {
+    try {
+      await fetch(`${API_BASE_URL}/api/employees/${encodeURIComponent(id)}/inside-chain`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ insideChain })
+      });
+    } catch (err: any) {
+      console.warn("Backend updateInsideChain failed, updating locally", err);
+    }
+    const employees = getStoredEmployees();
+    const idx = employees.findIndex(e => e.id === id);
+    if (idx !== -1) {
+      employees[idx] = { ...employees[idx], insideChain: insideChain as any };
       saveEmployees(employees);
     }
   },

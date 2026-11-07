@@ -9,10 +9,12 @@ import { EmployeeService } from '../services/employeeService';
 import { ScheduleService } from '../services/scheduleService';
 import type { Employee, Chain, MonthlyScheduleLink, SharePointAuthStatus, ScheduleMatrixData } from '../types';
 import { GlassCard } from '../components/common/GlassCard';
+import { useSidebar } from '../components/layout/Layout';
 
 const CHAINS: Chain[] = ['FPT Shop', 'Long Châu', 'Vaccine'];
 
 const Employees: React.FC = () => {
+  const { isCollapsed } = useSidebar();
   // Sub-tabs: 'employees' | 'schedule'
   const [activeTab, setActiveTab] = useState<'employees' | 'schedule'>('employees');
 
@@ -374,129 +376,157 @@ const Employees: React.FC = () => {
   });
 
   return (
-    <div className="w-full px-3.5 sm:px-6 lg:px-12 py-4 sm:py-8 lg:py-10 pb-16 relative z-10 animate-fade-in text-slate-800">
+    <div className={`w-full ${isCollapsed ? 'px-3.5 sm:px-6 py-3 sm:py-4' : 'px-3.5 sm:px-6 lg:px-12 py-4 sm:py-8 lg:py-10'} pb-16 relative z-10 animate-fade-in text-slate-800`}>
       
-      {/* Header & Sub-tab Switcher */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-[24px] sm:text-[28px] font-bold text-slate-900 tracking-tight">Quản lý nhân sự</h1>
-          <p className="text-[13px] text-slate-500 mt-0.5">
-            Quản lý hồ sơ nhân viên và lịch trực ca làm việc đồng bộ SharePoint
-          </p>
-        </div>
+      {/* Header & Sub-tab Switcher - An di khi thu nho sidebar de uu tien theo doi bang nhan vien */}
+      {!isCollapsed && (
+        <>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <h1 className="text-[24px] sm:text-[28px] font-bold text-slate-900 tracking-tight">Quản lý nhân sự</h1>
+              <p className="text-[13px] text-slate-500 mt-0.5">
+                Quản lý hồ sơ nhân viên và lịch trực ca làm việc đồng bộ SharePoint
+              </p>
+            </div>
 
-        {activeTab === 'employees' ? (
-          <button 
-            onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[12px] font-bold text-[14px] transition-colors shadow-sm cursor-pointer self-start sm:self-auto"
-          >
-            <Plus className="w-4 h-4" />
-            Thêm nhân viên
-          </button>
-        ) : (
-          <div className="flex items-center gap-2 self-start sm:self-auto">
+            {activeTab === 'employees' ? (
+              <button 
+                onClick={() => setIsAddModalOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[12px] font-bold text-[14px] transition-colors shadow-sm cursor-pointer self-start sm:self-auto"
+              >
+                <Plus className="w-4 h-4" />
+                Thêm nhân viên
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 self-start sm:self-auto">
+                <button
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-[13px] font-bold transition-all border shadow-xs cursor-pointer ${
+                    authStatus.authenticated
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100/70'
+                      : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100/70'
+                  }`}
+                  title="Quản lý phiên đăng nhập và Cookie Mail công ty"
+                >
+                  <KeyRound className="w-4 h-4" />
+                  {authStatus.authenticated ? 'Mail công ty: Đã kết nối' : 'Đăng nhập Mail công ty'}
+                </button>
+                
+                <button
+                  onClick={() => {
+                    setLinkFormData({
+                      month: selectedMonth,
+                      sharepointUrl: scheduleLink?.sharepointUrl || '',
+                      title: scheduleLink?.title || `Lịch làm việc Tháng ${selectedMonth.split('-')[1]}/${selectedMonth.split('-')[0]}`,
+                      note: scheduleLink?.note || ''
+                    });
+                    setIsLinkModalOpen(true);
+                  }}
+                  className="flex items-center gap-2 px-3.5 py-2 bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 rounded-xl text-[13px] font-bold transition-colors shadow-xs cursor-pointer"
+                >
+                  <Edit2 className="w-4 h-4 text-slate-500" />
+                  Cập nhật link tháng
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Modern Sub-tabs Navigation */}
+          <div className="flex border-b border-slate-200/80 mb-6 gap-2">
             <button
-              onClick={() => setIsAuthModalOpen(true)}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-[13px] font-bold transition-all border shadow-xs cursor-pointer ${
-                authStatus.authenticated
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100/70'
-                  : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100/70'
+              onClick={() => setActiveTab('employees')}
+              className={`flex items-center gap-2.5 pb-3 px-4 font-bold text-[14px] border-b-2 transition-all cursor-pointer ${
+                activeTab === 'employees'
+                  ? 'border-emerald-600 text-emerald-700'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
-              title="Quản lý phiên đăng nhập và Cookie Mail công ty"
             >
-              <KeyRound className="w-4 h-4" />
-              {authStatus.authenticated ? 'Mail công ty: Đã kết nối' : 'Đăng nhập Mail công ty'}
+              <Users className="w-4 h-4" />
+              Hồ sơ nhân sự
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold">
+                {employees.length}
+              </span>
             </button>
-            
+
             <button
-              onClick={() => {
-                setLinkFormData({
-                  month: selectedMonth,
-                  sharepointUrl: scheduleLink?.sharepointUrl || '',
-                  title: scheduleLink?.title || `Lịch làm việc Tháng ${selectedMonth.split('-')[1]}/${selectedMonth.split('-')[0]}`,
-                  note: scheduleLink?.note || ''
-                });
-                setIsLinkModalOpen(true);
-              }}
-              className="flex items-center gap-2 px-3.5 py-2 bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 rounded-xl text-[13px] font-bold transition-colors shadow-xs cursor-pointer"
+              onClick={() => setActiveTab('schedule')}
+              className={`flex items-center gap-2.5 pb-3 px-4 font-bold text-[14px] border-b-2 transition-all cursor-pointer ${
+                activeTab === 'schedule'
+                  ? 'border-emerald-600 text-emerald-700'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
             >
-              <Edit2 className="w-4 h-4 text-slate-500" />
-              Cập nhật link tháng
+              <Calendar className="w-4 h-4" />
+              Lịch làm việc & Ca trực
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/80 font-bold uppercase tracking-wider">
+                SharePoint
+              </span>
             </button>
           </div>
-        )}
-      </div>
-
-      {/* Modern Sub-tabs Navigation */}
-      <div className="flex border-b border-slate-200/80 mb-6 gap-2">
-        <button
-          onClick={() => setActiveTab('employees')}
-          className={`flex items-center gap-2.5 pb-3 px-4 font-bold text-[14px] border-b-2 transition-all cursor-pointer ${
-            activeTab === 'employees'
-              ? 'border-emerald-600 text-emerald-700'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          Hồ sơ nhân sự
-          <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold">
-            {employees.length}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('schedule')}
-          className={`flex items-center gap-2.5 pb-3 px-4 font-bold text-[14px] border-b-2 transition-all cursor-pointer ${
-            activeTab === 'schedule'
-              ? 'border-emerald-600 text-emerald-700'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <Calendar className="w-4 h-4" />
-          Lịch làm việc & Ca trực
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/80 font-bold uppercase tracking-wider">
-            SharePoint
-          </span>
-        </button>
-      </div>
+        </>
+      )}
 
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {/* TAB 1: DANH SÁCH NHÂN SỰ                                                */}
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {activeTab === 'employees' && (
         <>
-          {/* Metrics (Combined Bento Grid - Compact) */}
-          <div className="w-full max-w-[580px]">
-            <GlassCard className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 relative overflow-hidden mb-6 bg-white/60 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-200/60 rounded-2xl">
-              <div className="relative z-10 pl-2">
-                <div className="mb-2">
-                  <span className="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Tổng nhân sự</span>
+          {/* Metrics (Combined Bento Grid - Compact) - An khi thu nho sidebar */}
+          {!isCollapsed && (
+            <div className="w-full max-w-[580px]">
+              <GlassCard className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 relative overflow-hidden mb-6 bg-white/60 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-200/60 rounded-2xl">
+                <div className="relative z-10 pl-2">
+                  <div className="mb-2">
+                    <span className="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Tổng nhân sự</span>
+                  </div>
+                  <div className="text-[44px] sm:text-[54px] font-black text-slate-800 leading-none tracking-tight">{metrics.total}</div>
                 </div>
-                <div className="text-[44px] sm:text-[54px] font-black text-slate-800 leading-none tracking-tight">{metrics.total}</div>
+
+                <div className="relative z-10 w-full sm:w-[240px] flex flex-col gap-2">
+                  <div className="bg-white/80 backdrop-blur-md border border-slate-200/60 px-3.5 py-2 rounded-xl flex justify-between items-center shadow-2xs">
+                    <span className="text-[11.5px] font-bold text-slate-500 uppercase tracking-wider">FPT Shop</span>
+                    <span className="text-[16px] font-bold text-slate-800 leading-none">{metrics.fpt}</span>
+                  </div>
+
+                  <div className="bg-white/80 backdrop-blur-md border border-slate-200/60 px-3.5 py-2 rounded-xl flex justify-between items-center shadow-2xs">
+                    <span className="text-[11.5px] font-bold text-slate-500 uppercase tracking-wider">Long Châu</span>
+                    <span className="text-[16px] font-bold text-slate-800 leading-none">{metrics.longchau}</span>
+                  </div>
+
+                  <div className="bg-white/80 backdrop-blur-md border border-slate-200/60 px-3.5 py-2 rounded-xl flex justify-between items-center shadow-2xs">
+                    <span className="text-[11.5px] font-bold text-slate-500 uppercase tracking-wider">Vaccine</span>
+                    <span className="text-[16px] font-bold text-slate-800 leading-none">{metrics.vaccine}</span>
+                  </div>
+                </div>
+              </GlassCard>
+            </div>
+          )}
+
+          {/* Filters & Compact Header Controls */}
+          <div className="flex gap-2.5 sm:gap-3.5 mb-4 sm:mb-6 items-center flex-wrap">
+            {/* Khi thu nho sidebar: hien thi subtab gon gang ngay tren thanh tim kiem */}
+            {isCollapsed && (
+              <div className="flex items-center bg-slate-100/90 rounded-xl p-1 border border-slate-200/60 shadow-2xs shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('employees')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-bold transition-all cursor-pointer bg-white text-emerald-700 shadow-2xs"
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  Hồ sơ ({employees.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('schedule')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-bold transition-all cursor-pointer text-slate-500 hover:text-slate-800"
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  Lịch trực
+                </button>
               </div>
+            )}
 
-              <div className="relative z-10 w-full sm:w-[240px] flex flex-col gap-2">
-                <div className="bg-white/80 backdrop-blur-md border border-slate-200/60 px-3.5 py-2 rounded-xl flex justify-between items-center shadow-2xs">
-                  <span className="text-[11.5px] font-bold text-slate-500 uppercase tracking-wider">FPT Shop</span>
-                  <span className="text-[16px] font-bold text-slate-800 leading-none">{metrics.fpt}</span>
-                </div>
-
-                <div className="bg-white/80 backdrop-blur-md border border-slate-200/60 px-3.5 py-2 rounded-xl flex justify-between items-center shadow-2xs">
-                  <span className="text-[11.5px] font-bold text-slate-500 uppercase tracking-wider">Long Châu</span>
-                  <span className="text-[16px] font-bold text-slate-800 leading-none">{metrics.longchau}</span>
-                </div>
-
-                <div className="bg-white/80 backdrop-blur-md border border-slate-200/60 px-3.5 py-2 rounded-xl flex justify-between items-center shadow-2xs">
-                  <span className="text-[11.5px] font-bold text-slate-500 uppercase tracking-wider">Vaccine</span>
-                  <span className="text-[16px] font-bold text-slate-800 leading-none">{metrics.vaccine}</span>
-                </div>
-              </div>
-            </GlassCard>
-          </div>
-
-          {/* Filters */}
-          <div className="flex gap-4 mb-6 items-center flex-wrap">
-            <div className="relative flex-1 min-w-[240px] max-w-md">
+            <div className="relative flex-1 min-w-[200px] max-w-md">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input 
                 type="text" 
@@ -506,10 +536,11 @@ const Employees: React.FC = () => {
                 className="w-full pl-9 pr-4 py-2 rounded-[12px] border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-[14px]"
               />
             </div>
+            
             <select 
               value={chainFilter}
               onChange={e => setChainFilter(e.target.value as any)}
-              className="px-4 py-2 rounded-[12px] border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-[14px] font-medium"
+              className="px-3.5 py-2 rounded-[12px] border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-[13.5px] font-medium"
             >
               <option value="All">Tất cả chuỗi</option>
               <option value="FPT Shop">FPT Shop</option>
@@ -520,12 +551,25 @@ const Employees: React.FC = () => {
             <select 
               value={sortBy}
               onChange={e => setSortBy(e.target.value as any)}
-              className="px-4 py-2 rounded-[12px] border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-[14px] font-medium ml-auto"
+              className={`px-3.5 py-2 rounded-[12px] border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-[13.5px] font-medium ${isCollapsed ? '' : 'ml-auto'}`}
             >
               <option value="id">Sắp xếp theo Mail</option>
               <option value="chain">Sắp xếp theo Chuỗi</option>
               <option value="startDate">Sắp xếp theo Ngày bắt đầu</option>
             </select>
+
+            {/* Khi thu nho sidebar: bo sung nut "+ Them nhan vien" ngay tai hang tim kiem */}
+            {isCollapsed && (
+              <button 
+                type="button"
+                onClick={() => setIsAddModalOpen(true)}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[12px] font-bold text-[13px] transition-colors shadow-sm cursor-pointer ml-auto shrink-0"
+                title="Thêm nhân viên mới"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">Thêm nhân viên</span>
+              </button>
+            )}
           </div>
 
           {/* Table */}
@@ -621,7 +665,28 @@ const Employees: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/70 backdrop-blur-md border border-slate-200/80 p-4 rounded-2xl shadow-xs">
             
             {/* Month Navigator */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Khi thu nho sidebar tren tab Lich truc: hien thi subtab switcher */}
+              {isCollapsed && (
+                <div className="flex items-center bg-slate-100/90 rounded-xl p-1 border border-slate-200/60 shadow-2xs shrink-0 mr-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('employees')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-bold transition-all cursor-pointer text-slate-500 hover:text-slate-800"
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    Hồ sơ ({employees.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('schedule')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-bold transition-all cursor-pointer bg-white text-emerald-700 shadow-2xs"
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                    Lịch trực
+                  </button>
+                </div>
+              )}
               <span className="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Thời gian:</span>
               <div className="flex items-center bg-slate-100/90 rounded-xl p-1 border border-slate-200/60 shadow-2xs">
                 <button

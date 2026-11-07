@@ -11,39 +11,44 @@ from app.services.sharepoint.browser_session import SharePointBrowserSession, DE
 router = APIRouter()
 
 DEFAULT_EMPLOYEES = [
-    {"id": "LuanNV8", "name": "Nguyễn Văn Luân", "chain": "FPT Shop", "status": "Active"},
-    {"id": "MinhPP2", "name": "Phạm Phú Minh", "chain": "FPT Shop", "status": "Active"},
-    {"id": "QuyNN13", "name": "Nguyễn Ngọc Quý", "chain": "FPT Shop", "status": "Active"},
-    {"id": "TanTQ6", "name": "Trần Quang Tân", "chain": "FPT Shop", "status": "Active"},
-    {"id": "TuongPN3", "name": "Phan Ngọc Tường", "chain": "FPT Shop", "status": "Active"},
-    {"id": "BaoTDC", "name": "Trần Đức Chí Bảo", "chain": "FPT Shop", "status": "Active"},
-    {"id": "SonDQ3", "name": "Đặng Quang Sơn", "chain": "FPT Shop", "status": "Active"},
-    {"id": "DucNM79", "name": "Nguyễn Minh Đức", "chain": "FPT Shop", "status": "Active"},
-    {"id": "ViDNT2", "name": "Đỗ Ngọc Thúy Vi", "chain": "FPT Shop", "status": "Active"},
-    {"id": "DuyenNTM20", "name": "Nguyễn Thị Mỹ Duyên", "chain": "FPT Shop", "status": "Active"},
-    {"id": "SangLM4", "name": "Lê Minh Sáng", "chain": "FPT Shop", "status": "Active"},
-    {"id": "TamNT54", "name": "Nguyễn Thanh Tâm", "chain": "FPT Shop", "status": "Active"},
-    {"id": "SonTCH", "name": "Trần Công Hoàng Sơn", "chain": "FPT Shop", "status": "Active"},
-    {"id": "ThanhNN25", "name": "Nguyễn Ngọc Thanh", "chain": "FPT Shop", "status": "Active"},
-    {"id": "QuyNV34", "name": "Nguyễn Văn Quý", "chain": "FPT Shop", "status": "Active"},
-    {"id": "TaiVM3", "name": "Võ Minh Tài", "chain": "FPT Shop", "status": "Active"},
-    {"id": "ThongHQ3", "name": "Hồ Quốc Thông", "chain": "FPT Shop", "status": "Active"},
-    {"id": "DatCT10", "name": "Chiêng Tấn Đạt", "chain": "FPT Shop", "status": "Active"},
-    {"id": "PhongTTH2", "name": "Trần Trương Huy Phong", "chain": "FPT Shop", "status": "Active"},
-    {"id": "HienPN3", "name": "Phạm Ngọc Hiền", "chain": "FPT Shop", "status": "Active"},
-    {"id": "DuongNP", "name": "Nguyễn Phi Dương", "chain": "FPT Shop", "status": "Active"},
-    {"id": "LinhLT47", "name": "Lý Thành Linh", "chain": "FPT Shop", "status": "Active"},
-    {"id": "DuanHX", "name": "Hoàng Xuân Duẩn", "chain": "FPT Shop", "status": "Active"},
-    {"id": "NhanDT27", "name": "Dương Thành Nhân", "chain": "FPT Shop", "status": "Active"},
-    {"id": "TuNM35", "name": "Nguyễn Minh Tú", "chain": "FPT Shop", "status": "Active"},
-    {"id": "TamNM25", "name": "Nguyễn Minh Tâm", "chain": "FPT Shop", "status": "Active"},
-    {"id": "VyTTH6", "name": "Tạ Trần Hà Vy", "chain": "FPT Shop", "status": "Active"},
-    {"id": "MyPTK4", "name": "Phạm Thị Kiều My", "chain": "FPT Shop", "status": "Active"},
-    {"id": "NgocTB35", "name": "Trác Bảo Ngọc", "chain": "FPT Shop", "status": "Active"},
-    {"id": "TamLM10", "name": "Lê Minh Tâm", "chain": "FPT Shop", "status": "Active"},
-    {"id": "SonTT37", "name": "Trần Thiện Sơn", "chain": "FPT Shop", "status": "Active"},
-    {"id": "AnHSH2", "name": "Hứa Sang Hoàng Ân", "chain": "FPT Shop", "status": "Active"},
-    {"id": "DinhLV8", "name": "Lý Văn Định", "chain": "FPT Shop", "status": "Active"},
+    {"inside_code": "51765", "id": "VienND2", "name": "Ngô Đức Viện", "chain": "FPT Shop", "status": "Active"},
+    {"inside_code": "51771", "id": "DatNT215", "name": "Nguyễn Tấn Đạt", "chain": "FPT Shop", "status": "Active"},
+    {"inside_code": "34139", "id": "TinMT2", "name": "Mai Trọng Tín", "chain": "FPT Shop", "status": "Active"},
+    {"inside_code": "51799", "id": "HieuPM26", "name": "Phạm Minh Hiếu", "chain": "FPT Shop", "status": "Active"},
+    {"inside_code": "51794", "id": "TuanPA48", "name": "Phùng Anh Tuấn", "chain": "FPT Shop", "status": "Active"},
+    {"inside_code": "32690", "id": "LuanNV8", "name": "Nguyễn Văn Luân", "chain": "Long Châu", "status": "Active"},
+    {"inside_code": "51779", "id": "MinhPP2", "name": "Phạm Phú Minh", "chain": "Vaccine", "status": "Active"},
+    {"inside_code": "51784", "id": "QuyNN13", "name": "Nguyễn Ngọc Quý", "chain": "Vaccine", "status": "Active"},
+    {"inside_code": "51786", "id": "TanTQ6", "name": "Trần Quang Tân", "chain": "Long Châu", "status": "Active"},
+    {"inside_code": "51792", "id": "TuongPN3", "name": "Phan Ngọc Tường", "chain": "Vaccine", "status": "Active"},
+    {"inside_code": "51793", "id": "BaoTDC", "name": "Trần Đức Chí Bảo", "chain": "Long Châu", "status": "Active"},
+    {"inside_code": "51795", "id": "SonDQ3", "name": "Đặng Quang Sơn", "chain": "Long Châu", "status": "Active"},
+    {"inside_code": "51796", "id": "DucNM79", "name": "Nguyễn Minh Đức", "chain": "Long Châu", "status": "Active"},
+    {"inside_code": "12678", "id": "ViDNT2", "name": "Đỗ Ngọc Thúy Vi", "chain": "FPT Shop", "status": "Active"},
+    {"inside_code": "42372", "id": "DuyenNTM20", "name": "Nguyễn Thị Mỹ Duyên", "chain": "FPT Shop", "status": "Active"},
+    {"inside_code": "51800", "id": "SangLM4", "name": "Lê Minh Sáng", "chain": "FPT Shop", "status": "Active"},
+    {"inside_code": "51801", "id": "TamNT54", "name": "Nguyễn Thanh Tâm", "chain": "Long Châu", "status": "Active"},
+    {"inside_code": "51803", "id": "SonTCH", "name": "Trần Công Hoàng Sơn", "chain": "Long Châu", "status": "Active"},
+    {"inside_code": "100859", "id": "ThanhNN25", "name": "Nguyễn Ngọc Thanh", "chain": "Vaccine", "status": "Active"},
+    {"inside_code": "111358", "id": "QuyNV34", "name": "Nguyễn Văn Quý", "chain": "Long Châu", "status": "Active"},
+    {"inside_code": "51806", "id": "TaiVM3", "name": "Võ Minh Tài", "chain": "Vaccine", "status": "Active"},
+    {"inside_code": "51808", "id": "ThongHQ3", "name": "Hồ Quốc Thông", "chain": "Long Châu", "status": "Active"},
+    {"inside_code": "51809", "id": "DatCT10", "name": "Chiêng Tấn Đạt", "chain": "Long Châu", "status": "Active"},
+    {"inside_code": "51810", "id": "PhongTTH2", "name": "Trần Trương Huy Phong", "chain": "Vaccine", "status": "Active"},
+    {"inside_code": "107683", "id": "HienPN3", "name": "Phạm Ngọc Hiền", "chain": "Long Châu", "status": "Active"},
+    {"inside_code": "55003", "id": "DuongNP", "name": "Nguyễn Phi Dương", "chain": "Vaccine", "status": "Active"},
+    {"inside_code": "55005", "id": "LinhLT47", "name": "Lý Thành Linh", "chain": "Long Châu", "status": "Active"},
+    {"inside_code": "55006", "id": "DuanHX", "name": "Hoàng Xuân Duẩn", "chain": "Long Châu", "status": "Active"},
+    {"inside_code": "62997", "id": "NhanDT27", "name": "Dương Thành Nhân", "chain": "Vaccine", "status": "Active"},
+    {"inside_code": "109476", "id": "TuNM35", "name": "Nguyễn Minh Tú", "chain": "Long Châu", "status": "Active"},
+    {"inside_code": "110494", "id": "TamNM25", "name": "Nguyễn Minh Tâm", "chain": "FPT Shop", "status": "Active"},
+    {"inside_code": "110510", "id": "VyTTH6", "name": "Tạ Trần Hà Vy", "chain": "Long Châu", "status": "Active"},
+    {"inside_code": "66651", "id": "MyPTK4", "name": "Phạm Thị Kiều My", "chain": "FPT Shop", "status": "Active"},
+    {"inside_code": "68855", "id": "NgocTB35", "name": "Trác Bảo Ngọc", "chain": "Long Châu", "status": "Active"},
+    {"inside_code": "69846", "id": "TamLM10", "name": "Lê Minh Tâm", "chain": "FPT Shop", "status": "Active"},
+    {"inside_code": "112060", "id": "SonTT37", "name": "Trần Thiện Sơn", "chain": "Long Châu", "status": "Active"},
+    {"inside_code": "72033", "id": "AnHSH2", "name": "Hứa Sang Hoàng Ân", "chain": "FPT Shop", "status": "Active"},
+    {"inside_code": "112661", "id": "DinhLV8", "name": "Lý Văn Định", "chain": "FPT Shop", "status": "Active"},
 ]
 
 def _seed_if_empty(db: Session):
@@ -52,6 +57,7 @@ def _seed_if_empty(db: Session):
         for item in DEFAULT_EMPLOYEES:
             emp = Employee(
                 id=item["id"],
+                inside_code=item.get("inside_code", ""),
                 name=item["name"],
                 chain=item["chain"],
                 status=item["status"],
@@ -64,6 +70,7 @@ def _seed_if_empty(db: Session):
 def serialize_employee(e: Employee) -> dict:
     return {
         "id": e.id,
+        "insideCode": e.inside_code or "",
         "name": e.name,
         "chain": e.chain,
         "position": e.position or "",
@@ -87,6 +94,7 @@ def serialize_history(h: EmployeeTransferHistory) -> dict:
 
 class EmployeeCreateRequest(BaseModel):
     id: str
+    insideCode: Optional[str] = ""
     name: str
     chain: str
     position: Optional[str] = ""
@@ -94,6 +102,7 @@ class EmployeeCreateRequest(BaseModel):
     startDate: Optional[str] = ""
 
 class EmployeeUpdateRequest(BaseModel):
+    insideCode: Optional[str] = None
     name: Optional[str] = None
     chain: Optional[str] = None
     position: Optional[str] = None
@@ -121,6 +130,7 @@ def create_employee(req: EmployeeCreateRequest, db: Session = Depends(get_db)):
     
     emp = Employee(
         id=req.id.strip(),
+        inside_code=(req.insideCode or "").strip(),
         name=req.name.strip(),
         chain=req.chain,
         position=req.position,
@@ -140,6 +150,8 @@ def update_employee(emp_id: str, req: EmployeeUpdateRequest, db: Session = Depen
     if not emp:
         raise HTTPException(status_code=404, detail="Không tìm thấy nhân viên!")
     
+    if req.insideCode is not None:
+        emp.inside_code = req.insideCode.strip()
     if req.name is not None:
         emp.name = req.name.strip()
     if req.chain is not None:

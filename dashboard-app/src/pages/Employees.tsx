@@ -26,7 +26,7 @@ const Employees: React.FC = () => {
   const [search, setSearch] = useState('');
   const [chainFilter, setChainFilter] = useState<Chain | 'All'>('All');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Inactive'>('All');
-  const [sortBy, setSortBy] = useState<'name' | 'id' | 'chain' | 'status'>('name');
+  const [sortBy, setSortBy] = useState<'insideCode' | 'name' | 'id' | 'chain' | 'status' | 'startDate'>('insideCode');
   
   // Modals for Employees
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -38,6 +38,7 @@ const Employees: React.FC = () => {
   // Form State for Employee
   const [formData, setFormData] = useState({
     id: '',
+    insideCode: '',
     name: '',
     chain: 'FPT Shop' as Chain,
     position: '',
@@ -269,10 +270,21 @@ const Employees: React.FC = () => {
     if (statusFilter !== 'All' && emp.status !== statusFilter) return false;
     if (search) {
       const q = search.toLowerCase();
-      if (!emp.name.toLowerCase().includes(q) && !emp.id.toLowerCase().includes(q)) return false;
+      const matchName = emp.name.toLowerCase().includes(q);
+      const matchId = emp.id.toLowerCase().includes(q);
+      const matchInside = (emp.insideCode || '').toLowerCase().includes(q);
+      if (!matchName && !matchId && !matchInside) return false;
     }
     return true;
   }).sort((a, b) => {
+    if (sortBy === 'insideCode') {
+      const numA = parseInt(a.insideCode || '0', 10);
+      const numB = parseInt(b.insideCode || '0', 10);
+      if (!isNaN(numA) && !isNaN(numB) && numA > 0 && numB > 0) {
+        return numA - numB;
+      }
+      return (a.insideCode || '').localeCompare(b.insideCode || '');
+    }
     if (sortBy === 'name') return a.name.localeCompare(b.name);
     if (sortBy === 'id') return a.id.localeCompare(b.id);
     if (sortBy === 'chain') return a.chain.localeCompare(b.chain);
@@ -300,7 +312,7 @@ const Employees: React.FC = () => {
       const newEmp = await EmployeeService.createEmployee(formData);
       setEmployees(prev => [newEmp, ...prev]);
       setIsAddModalOpen(false);
-      setFormData({ id: '', name: '', chain: 'FPT Shop', position: '', status: 'Active', startDate: '' });
+      setFormData({ id: '', insideCode: '', name: '', chain: 'FPT Shop', position: '', status: 'Active', startDate: '' });
     } catch (err: any) {
       setFormError(err.message || 'Lỗi khi thêm nhân viên');
     }
@@ -312,6 +324,7 @@ const Employees: React.FC = () => {
     try {
       const updated = await EmployeeService.updateEmployee({
         ...selectedEmployee,
+        insideCode: formData.insideCode,
         name: formData.name, position: formData.position, status: formData.status, startDate: formData.startDate
       });
       updateLocalEmployee(updated);
@@ -530,7 +543,7 @@ const Employees: React.FC = () => {
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input 
                 type="text" 
-                placeholder="Tìm kiếm theo Mail, họ tên..." 
+                placeholder="Tìm theo Mã Inside, Mail, họ tên..." 
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 className="w-full pl-9 pr-4 py-2 rounded-[12px] border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-[14px]"
@@ -553,7 +566,9 @@ const Employees: React.FC = () => {
               onChange={e => setSortBy(e.target.value as any)}
               className={`px-3.5 py-2 rounded-[12px] border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-[13.5px] font-medium ${isCollapsed ? '' : 'ml-auto'}`}
             >
+              <option value="insideCode">Sắp xếp theo Mã Inside</option>
               <option value="id">Sắp xếp theo Mail</option>
+              <option value="name">Sắp xếp theo Tên</option>
               <option value="chain">Sắp xếp theo Chuỗi</option>
               <option value="startDate">Sắp xếp theo Ngày bắt đầu</option>
             </select>
@@ -578,6 +593,7 @@ const Employees: React.FC = () => {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50/50">
+                    <th className="px-6 py-4 text-[13px] font-bold text-slate-500 uppercase tracking-wider">Mã Inside</th>
                     <th className="px-6 py-4 text-[13px] font-bold text-slate-500 uppercase tracking-wider">Mail</th>
                     <th className="px-6 py-4 text-[13px] font-bold text-slate-500 uppercase tracking-wider">Họ và tên</th>
                     <th className="px-6 py-4 text-[13px] font-bold text-slate-500 uppercase tracking-wider">Chuỗi</th>
@@ -588,15 +604,18 @@ const Employees: React.FC = () => {
                 <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-8 text-center text-slate-500 font-medium">Đang tải danh sách nhân viên...</td>
+                      <td colSpan={6} className="px-6 py-8 text-center text-slate-500 font-medium">Đang tải danh sách nhân viên...</td>
                     </tr>
                   ) : filteredEmployees.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-8 text-center text-slate-500 font-medium">Không tìm thấy nhân viên phù hợp</td>
+                      <td colSpan={6} className="px-6 py-8 text-center text-slate-500 font-medium">Không tìm thấy nhân viên phù hợp</td>
                     </tr>
                   ) : (
                     filteredEmployees.map((emp) => (
                       <tr key={emp.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-6 py-4 text-[14px] font-extrabold text-indigo-600 font-mono tracking-wide">
+                          {emp.insideCode || '-'}
+                        </td>
                         <td className="px-6 py-4 text-[14px] font-bold text-slate-900">{emp.id}</td>
                         <td className="px-6 py-4 text-[14px] font-medium text-slate-800">{emp.name}</td>
                         <td className="px-6 py-4 text-[14px] font-medium">
@@ -618,6 +637,7 @@ const Employees: React.FC = () => {
                                 setSelectedEmployee(emp); 
                                 setFormData({
                                   ...formData, 
+                                  insideCode: emp.insideCode || '',
                                   name: emp.name, 
                                   position: emp.position || '', 
                                   status: emp.status, 
@@ -1323,9 +1343,15 @@ const Employees: React.FC = () => {
             )}
 
             <form onSubmit={handleAddSubmit} className="space-y-4">
-              <div>
-                <label className="block text-[13px] font-bold text-slate-700 mb-1">Mail *</label>
-                <input required type="text" value={formData.id} onChange={e => setFormData({...formData, id: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500/50 outline-none"/>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[13px] font-bold text-slate-700 mb-1">Mã Inside</label>
+                  <input type="text" placeholder="VD: 51765" value={formData.insideCode} onChange={e => setFormData({...formData, insideCode: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500/50 outline-none font-mono"/>
+                </div>
+                <div>
+                  <label className="block text-[13px] font-bold text-slate-700 mb-1">Mail *</label>
+                  <input required type="text" placeholder="VD: VienND2" value={formData.id} onChange={e => setFormData({...formData, id: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500/50 outline-none"/>
+                </div>
               </div>
               <div>
                 <label className="block text-[13px] font-bold text-slate-700 mb-1">Họ và tên *</label>
@@ -1387,9 +1413,15 @@ const Employees: React.FC = () => {
               </div>
             ) : (
               <form onSubmit={handleEditSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-[13px] font-bold text-slate-700 mb-1">Mail (Không thể đổi)</label>
-                  <input disabled type="text" value={selectedEmployee.id} className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 cursor-not-allowed outline-none"/>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[13px] font-bold text-slate-700 mb-1">Mã Inside</label>
+                    <input type="text" placeholder="VD: 51765" value={formData.insideCode} onChange={e => setFormData({...formData, insideCode: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500/50 outline-none font-mono"/>
+                  </div>
+                  <div>
+                    <label className="block text-[13px] font-bold text-slate-700 mb-1">Mail (Không thể đổi)</label>
+                    <input disabled type="text" value={selectedEmployee.id} className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 cursor-not-allowed outline-none"/>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-[13px] font-bold text-slate-700 mb-1">Họ và tên *</label>

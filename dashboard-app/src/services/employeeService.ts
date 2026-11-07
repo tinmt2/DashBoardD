@@ -140,6 +140,7 @@ export const EmployeeService = {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          insideCode: employee.insideCode,
           name: employee.name,
           chain: employee.chain,
           position: employee.position,

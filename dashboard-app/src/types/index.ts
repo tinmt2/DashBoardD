@@ -17,7 +17,8 @@ export type TimeRange = '24h' | '7d' | '30d';
 // ─── Employee ────────────────────────────────────────────────────────────────
 
 export interface Employee {
-  id: string;
+  id: string; // Mail/Tài khoản
+  insideCode?: string; // Mã Inside (e.g. 51765)
   name: string;
   chain: Chain;
   status: 'Active' | 'Inactive';

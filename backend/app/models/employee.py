@@ -5,7 +5,8 @@ from app.core.database import Base
 class Employee(Base):
     __tablename__ = "employees"
 
-    id = Column(String, primary_key=True, index=True)
+    id = Column(String, primary_key=True, index=True)  # Mail (e.g. "VienND2")
+    inside_code = Column(String, nullable=True, index=True)  # Mã Inside (e.g. "51765")
     name = Column(String, nullable=False, index=True)
     chain = Column(String, nullable=False, default="FPT Shop", index=True)
     position = Column(String, nullable=True)

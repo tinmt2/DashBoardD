@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "paths": {
+    "region_file": "./data/Danh_sach_vung.xlsx",
+    "warehouse_file": "test_text.csv"
+  },
+  "gsheet": {
+    "cred_file": "Checkcam.json",
+    "spreadsheet_id": "YOUR_GOOGLE_SPREADSHEET_ID_HERE",
+    "target_gid": 1062029638,
+    "sheet_cam_mkn": "Cam mkn",
+    "sheet_summary": "Tao_Ticket",
+    "sheet_zalo_monitor": "Zalo_Error_Monitor",
+    "sheet_zalo_handover": "Zalo_Bao_Cao_Ca"
+  },
+  "check_cam": {
+    "known_errors_csv_url": "",
+    "enable_playback_last_time": true,
+    "playback_days": 7,
+    "playback_use_local_time": true,
+    "playback_end_margin_hours": 2,
+    "playback_debug_ip": "",
+    "playback_debug_max": 1,
+    "periodic_enabled": true,
+    "periodic_interval_minutes": 15,
+    "recovery_sheet_name": "Cam chập chờn",
+    "periodic_auto_sync": true
+  },
+  "zalo_monitor": {
+    "fixed_group_name": "GS AN NINH",
+    "handover_max_lines": 6,
+    "batch_interval_minutes": 10,
+    "spreadsheet_id": "YOUR_ZALO_SPREADSHEET_ID_HERE",
+    "sheet_zalo_monitor": "Gs An Ninh",
+    "sheet_zalo_handover": "Zalo_Bao_Cao_Ca"
+  }
+}

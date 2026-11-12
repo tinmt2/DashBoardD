@@ -33,10 +33,12 @@ export const getAutoSyncConfig = async (): Promise<AutoSyncConfig> => {
 };
 
 export const updateAutoSyncConfig = async (payload: UpdateAutoSyncPayload): Promise<AutoSyncConfig> => {
+  const token = localStorage.getItem('admin_token');
   const response = await fetch(`${API_BASE_URL}/api/auto-sync/config`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify(payload),
   });
@@ -49,8 +51,10 @@ export const updateAutoSyncConfig = async (payload: UpdateAutoSyncPayload): Prom
 };
 
 export const triggerAutoSyncRunNow = async (): Promise<{ success: boolean; message: string }> => {
+  const token = localStorage.getItem('admin_token');
   const response = await fetch(`${API_BASE_URL}/api/auto-sync/run-now`, {
     method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));

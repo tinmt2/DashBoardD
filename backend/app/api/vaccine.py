@@ -90,9 +90,6 @@ def vaccine_auth_otp(req: OtpRequest):
 def vaccine_auth_status():
     session = VaccineBrowserSession.get_instance()
     status = session.get_status()
-    if status == "STOPPED" and not getattr(session, '_initial_probed', False):
-        session._initial_probed = True
-        status = session.start(probe_only=True)
     return {"authenticated": status == "AUTHENTICATED", "status": status}
 
 @router.post("/sync")

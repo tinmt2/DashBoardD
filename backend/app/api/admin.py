@@ -18,31 +18,18 @@ from app.services.vaccine.login.browser_session import VaccineBrowserSession
 
 router = APIRouter()
 
+from app.core.auth import (
+    get_admin_config as _get_config,
+    save_admin_config as _save_config,
+    verify_admin_token,
+    revoke_admin_token
+)
+
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "..", "admin_config.json")
 START_TIME = time.time()
 
 def _hash_pw(password: str) -> str:
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
-
-def _get_config() -> dict:
-    if os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            pass
-    # Default config
-    default_cfg = {
-        "admin_username": "admin",
-        "admin_password_hash": _hash_pw("admin@123"),
-        "active_tokens": []
-    }
-    _save_config(default_cfg)
-    return default_cfg
-
-def _save_config(cfg: dict):
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(cfg, f, indent=2, ensure_ascii=False)
 
 class LoginRequest(BaseModel):
     username: str
@@ -82,24 +69,21 @@ def admin_login(req: LoginRequest):
 
 @router.post("/verify")
 def verify_token(authorization: Optional[str] = Header(None)):
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Chưa có token xác thực!")
-    token = authorization.replace("Bearer ", "").strip()
+    verify_admin_token(authorization)
     cfg = _get_config()
-    valid_tokens = [t["token"] for t in cfg.get("active_tokens", [])]
-    if token not in valid_tokens:
-        raise HTTPException(status_code=401, detail="Phiên đăng nhập Admin đã hết hạn!")
     return {"valid": True, "username": cfg.get("admin_username", "admin")}
+
+@router.post("/logout")
+def admin_logout(authorization: Optional[str] = Header(None)):
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.replace("Bearer ", "").strip()
+        revoke_admin_token(token)
+    return {"success": True, "message": "Đã đăng xuất phiên làm việc!"}
 
 @router.post("/change-password")
 def change_password(req: ChangePasswordRequest, authorization: Optional[str] = Header(None)):
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Yêu cầu quyền Admin!")
-    token = authorization.replace("Bearer ", "").strip()
+    verify_admin_token(authorization)
     cfg = _get_config()
-    valid_tokens = [t["token"] for t in cfg.get("active_tokens", [])]
-    if token not in valid_tokens:
-        raise HTTPException(status_code=401, detail="Phiên đăng nhập không hợp lệ!")
     
     if _hash_pw(req.old_password) != cfg.get("admin_password_hash"):
         raise HTTPException(status_code=400, detail="Mật khẩu cũ không đúng!")
@@ -113,13 +97,8 @@ def change_password(req: ChangePasswordRequest, authorization: Optional[str] = H
 
 @router.get("/totp-config")
 def get_totp_config(authorization: Optional[str] = Header(None)):
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Yêu cầu quyền Admin!")
-    token = authorization.replace("Bearer ", "").strip()
+    verify_admin_token(authorization)
     cfg = _get_config()
-    valid_tokens = [t["token"] for t in cfg.get("active_tokens", [])]
-    if token not in valid_tokens:
-        raise HTTPException(status_code=401, detail="Phiên đăng nhập không hợp lệ!")
     
     secret = (cfg.get("totp_secret") or "").strip()
     from app.core.totp import generate_totp
@@ -142,13 +121,8 @@ def get_totp_config(authorization: Optional[str] = Header(None)):
 
 @router.post("/totp-config")
 def save_totp_config(req: TotpConfigRequest, authorization: Optional[str] = Header(None)):
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Yêu cầu quyền Admin!")
-    token = authorization.replace("Bearer ", "").strip()
+    verify_admin_token(authorization)
     cfg = _get_config()
-    valid_tokens = [t["token"] for t in cfg.get("active_tokens", [])]
-    if token not in valid_tokens:
-        raise HTTPException(status_code=401, detail="Phiên đăng nhập không hợp lệ!")
     
     from app.core.totp import extract_secret_from_input, generate_totp
     raw = req.secret.strip()
@@ -173,13 +147,8 @@ def save_totp_config(req: TotpConfigRequest, authorization: Optional[str] = Head
 
 @router.post("/totp-config/test")
 def test_totp_config(req: TestTotpRequest, authorization: Optional[str] = Header(None)):
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Yêu cầu quyền Admin!")
-    token = authorization.replace("Bearer ", "").strip()
+    verify_admin_token(authorization)
     cfg = _get_config()
-    valid_tokens = [t["token"] for t in cfg.get("active_tokens", [])]
-    if token not in valid_tokens:
-        raise HTTPException(status_code=401, detail="Phiên đăng nhập không hợp lệ!")
     
     secret = (req.secret or cfg.get("totp_secret") or "").strip().replace(" ", "").upper()
     if not secret:
@@ -197,7 +166,8 @@ def test_totp_config(req: TestTotpRequest, authorization: Optional[str] = Header
     }
 
 @router.get("/overview")
-def admin_overview(db: Session = Depends(get_db)):
+def admin_overview(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    verify_admin_token(authorization)
     # 1. Server & System Metrics
     uptime_sec = int(time.time() - START_TIME)
     hours, rem = divmod(uptime_sec, 3600)
@@ -305,8 +275,10 @@ from app.core.logging import get_recent_logs, clear_memory_logs
 def get_admin_logs(
     lines: int = Query(200, ge=1, le=2000),
     level: Optional[str] = Query("ALL"),
-    search: Optional[str] = Query(None)
+    search: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None)
 ):
+    verify_admin_token(authorization)
     logs = get_recent_logs(lines=lines, level=level, search=search)
     return {
         "success": True,
@@ -315,12 +287,14 @@ def get_admin_logs(
     }
 
 @router.delete("/logs")
-def clear_admin_logs():
+def clear_admin_logs(authorization: Optional[str] = Header(None)):
+    verify_admin_token(authorization)
     clear_memory_logs()
     return {"success": True, "message": "Đã làm trống toàn bộ log trong bộ nhớ!"}
 
 @router.post("/test-sync/fpt")
-def test_sync_fpt_admin(db: Session = Depends(get_db)):
+def test_sync_fpt_admin(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    verify_admin_token(authorization)
     from app.api.fpt_shop import sync_fpt_shop, SyncRequest
     from datetime import date
     import logging

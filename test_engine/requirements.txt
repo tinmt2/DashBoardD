@@ -1,0 +1,11 @@
+pandas
+requests
+selenium
+webdriver-manager
+gspread
+oauth2client
+ping3
+openpyxl
+fastapi
+uvicorn
+python-multipart

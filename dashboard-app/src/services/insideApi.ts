@@ -13,7 +13,10 @@ export interface InsideCredsResponse {
 }
 
 export async function getInsideCreds(): Promise<InsideCredsResponse> {
-  const res = await fetch(`${API_BASE_URL}/api/inside/creds`);
+  const token = localStorage.getItem('admin_token');
+  const res = await fetch(`${API_BASE_URL}/api/inside/creds`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
   if (!res.ok) {
     throw new Error('Failed to fetch inside creds');
   }
@@ -21,10 +24,12 @@ export async function getInsideCreds(): Promise<InsideCredsResponse> {
 }
 
 export async function saveInsideCreds(creds: InsideCreds): Promise<{ success: boolean; message: string }> {
+  const token = localStorage.getItem('admin_token');
   const res = await fetch(`${API_BASE_URL}/api/inside/creds`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify(creds),
   });

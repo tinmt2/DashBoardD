@@ -1,0 +1,6 @@
+{
+  "admin_username": "admin",
+  "admin_password_hash": "REPLACE_WITH_SHA256_PASSWORD_HASH",
+  "active_tokens": [],
+  "totp_secret": "REPLACE_WITH_BASE32_TOTP_SECRET"
+}

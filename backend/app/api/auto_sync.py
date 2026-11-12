@@ -1,3 +1,5 @@
+from fastapi import Header
+from app.core.auth import verify_admin_token
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Optional
@@ -29,7 +31,8 @@ def get_auto_sync_config():
 
 
 @router.post("/config")
-def update_auto_sync_config(payload: AutoSyncConfigUpdate):
+def update_auto_sync_config(payload: AutoSyncConfigUpdate, authorization: Optional[str] = Header(None)):
+    verify_admin_token(authorization)
     """
     Update auto-sync configuration (toggle active, change interval, chains, date range).
     """
@@ -44,7 +47,8 @@ def update_auto_sync_config(payload: AutoSyncConfigUpdate):
 
 
 @router.post("/run-now")
-def trigger_auto_sync_now():
+def trigger_auto_sync_now(authorization: Optional[str] = Header(None)):
+    verify_admin_token(authorization)
     """
     Manually trigger an immediate background synchronization across configured chains.
     """

@@ -1,6 +1,0 @@
-{
-  "dependencies": {
-    "localtunnel": "^2.0.2",
-    "sqlite3": "^6.0.1"
-  }
-}

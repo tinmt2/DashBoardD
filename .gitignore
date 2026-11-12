@@ -15,6 +15,8 @@ ag-kit-main/
 !dashboard-app/**/*.js
 !dashboard-app/**/*.jsx
 !backend/**/*.js
+!test_engine/**/*.js
+!test_engine/**/*.jsx
 patch_*.py
 fix_*.py
 restore*.js
@@ -28,3 +30,33 @@ skills-lock.json
 .DS_Store
 *.exe
 config.yml
+
+# --- Test Engine Runtime, Data & Local Databases ---
+test_engine/runtime/
+**/runtime/
+*.db
+*.sqlite
+
+# --- Sensitive Configs & Credentials ---
+*Checkcam*.json
+*check-cam*.json
+*secret*.json
+backend/app/admin_config.json
+admin_config.json
+test_engine/config.json
+.env
+.env.*
+
+# --- Binaries, Drivers & Archives ---
+*.zip
+*.7z
+chromedriver*
+test_engine/desktop/dist/
+test_engine/desktop/dist-electron/
+test_engine/desktop/release/
+
+# --- Cache & Logs ---
+.ruff_cache/
+__pycache__/
+.pytest_cache/
+test_engine/**/*.log

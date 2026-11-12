@@ -1,0 +1,21 @@
+﻿# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+.venv_local/
+
+# Runtime data
+runtime/
+
+# Local secrets/config
+*.log
+
+# Generated reports
+outputs/
+*_KQ.xlsx
+*_AUTO.xlsx
+*_FTEL.xlsx
+BaoCao_*.xlsx
+KQ_Check_*.xlsx

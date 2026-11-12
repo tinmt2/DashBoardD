@@ -1,0 +1,58 @@
+[
+  {
+    "MaShop": "5C002",
+    "TenShop": "Vaccine 2",
+    "IP_DauGhi": "127.0.0.1",
+    "Brand": "HIK",
+    "Port": 81,
+    "ChiTiet": "Camera 1",
+    "IP_Cam_Con": "",
+    "Port_Cam_Con": "",
+    "TrangThai": "LỖI MỚI (Mất Playback)",
+    "LastRecordTime": "2024-01-01 10:00:00",
+    "GhiChu": "",
+    "PhanLoai": "NORMAL"
+  },
+  {
+    "MaShop": "5C001",
+    "TenShop": "Vaccine 1",
+    "IP_DauGhi": "8.8.8.8",
+    "Brand": "HIK",
+    "Port": 81,
+    "ChiTiet": "Camera 1",
+    "IP_Cam_Con": "",
+    "Port_Cam_Con": "",
+    "TrangThai": "LỖI MỚI (Mất Playback)",
+    "LastRecordTime": "2024-01-01 10:00:00",
+    "GhiChu": "",
+    "PhanLoai": "NORMAL"
+  },
+  {
+    "MaShop": "8C001",
+    "TenShop": "Long Chau 1",
+    "IP_DauGhi": "1.1.1.1",
+    "Brand": "HIK",
+    "Port": 81,
+    "ChiTiet": "Camera 1",
+    "IP_Cam_Con": "",
+    "Port_Cam_Con": "",
+    "TrangThai": "LỖI MỚI (Mất Playback)",
+    "LastRecordTime": "2024-01-01 10:00:00",
+    "GhiChu": "",
+    "PhanLoai": "NORMAL"
+  },
+  {
+    "MaShop": "8C002",
+    "TenShop": "Long Chau 2",
+    "IP_DauGhi": "256.256.256.256",
+    "Brand": "HIK",
+    "Port": 81,
+    "ChiTiet": "Camera 1",
+    "IP_Cam_Con": "",
+    "Port_Cam_Con": "",
+    "TrangThai": "LỖI MỚI (Mất Playback)",
+    "LastRecordTime": "2024-01-01 10:00:00",
+    "GhiChu": "",
+    "PhanLoai": "NORMAL"
+  }
+]

@@ -1,3 +1,5 @@
+from fastapi import Header
+from app.core.auth import verify_admin_token
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
@@ -25,7 +27,8 @@ class InsideCredsResponse(BaseModel):
     has_password: bool = False
 
 @router.get("/creds", response_model=InsideCredsResponse)
-def get_inside_creds():
+def get_inside_creds(authorization: Optional[str] = Header(None)):
+    verify_admin_token(authorization)
     username = ""
     password = ""
     
@@ -62,7 +65,8 @@ def get_inside_creds():
     )
 
 @router.post("/creds")
-def save_inside_creds(req: InsideCredsRequest):
+def save_inside_creds(req: InsideCredsRequest, authorization: Optional[str] = Header(None)):
+    verify_admin_token(authorization)
     username = (req.username or "").strip()
     password = req.password or ""
     

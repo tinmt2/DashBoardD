@@ -1,0 +1,63 @@
+{
+  "name": "desktop",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "vite --port 5175 --strictPort",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "electron:build": "tsc -p tsconfig.electron.json",
+    "electron:dev": "concurrently \"vite --port 5175 --strictPort\" \"wait-on tcp:5175 && npm run electron:build && cross-env NODE_ENV=development ELECTRON_DEV_URL=http://localhost:5175 electron .\"",
+    "electron:pack": "npm run build && npm run electron:build && electron-builder"
+  },
+  "dependencies": {
+    "lucide-react": "^1.48.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^24.13.6",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "autoprefixer": "^10.6.1",
+    "concurrently": "^10.0.5",
+    "cross-env": "^10.1.0",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
+    "oxlint": "^1.81.0",
+    "postcss": "^8.5.28",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0",
+    "wait-on": "^9.1.0"
+  },
+  "build": {
+    "appId": "com.test.migration",
+    "productName": "Migration Test App",
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": ["nsis"]
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../dist/backend",
+        "to": "backend",
+        "filter": ["**/*"]
+      }
+    ]
+  }
+}

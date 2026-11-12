@@ -2,9 +2,10 @@
 // Streamlined & Clean Admin Dashboard for DashBoardD
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
-  Eye, EyeOff, Loader2, KeyRound, Check, RefreshCw, Copy
+  Eye, EyeOff, Loader2, KeyRound, Check, RefreshCw, Copy,
+  User, Lock, ShieldCheck, ShieldAlert, Store, Pill, ShieldPlus, Save, AlertCircle, CheckCircle2, Settings
 } from 'lucide-react';
 import { 
   getAutoSyncConfig, 
@@ -12,6 +13,10 @@ import {
   triggerAutoSyncRunNow, 
   AutoSyncConfig 
 } from '../services/autoSyncApi';
+import { getInsideCreds, saveInsideCreds } from '../services/insideApi';
+import { startFptShopAuth } from '../services/fptShopApi';
+import { startLongChauAuth } from '../services/longChauApi';
+import { startVaccineAuth } from '../services/vaccineApi';
 import { GlassCard } from '../components/common/GlassCard';
 import BrandLogo from '../components/common/BrandLogo';
 import { parseUtcDate } from '../utils/dateUtils';
@@ -58,10 +63,11 @@ interface SystemOverview {
   checked_at: string;
 }
 
-type AdminTab = 'autosync' | 'totp' | 'logs' | 'audit';
+type AdminTab = 'inside' | 'autosync' | 'totp' | 'logs' | 'audit';
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('admin_token'));
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('');
@@ -70,7 +76,30 @@ const Admin: React.FC = () => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Active Tab state (Lucian #039 Sliding Pill Tabs)
-  const [activeTab, setActiveTab] = useState<AdminTab>('autosync');
+  const [activeTab, setActiveTab] = useState<AdminTab>(() => {
+    const tabParam = searchParams.get('tab') as AdminTab;
+    return tabParam && ['inside', 'autosync', 'totp', 'logs', 'audit'].includes(tabParam) ? tabParam : 'inside';
+  });
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab') as AdminTab;
+    if (tabParam && ['inside', 'autosync', 'totp', 'logs', 'audit'].includes(tabParam) && tabParam !== activeTab) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (tab: AdminTab) => {
+    setActiveTab(tab);
+    setSearchParams({ tab });
+  };
+
+  // Inside Credentials State
+  const [insideCreds, setInsideCreds] = useState({ username: '', password: '' });
+  const [showInsidePassword, setShowInsidePassword] = useState(false);
+  const [isSavingInsideCreds, setIsSavingInsideCreds] = useState(false);
+  const [insideFeedback, setInsideFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [testingChain, setTestingChain] = useState<'fpt_shop' | 'long_chau' | 'vaccine' | null>(null);
+  const [chainFeedback, setChainFeedback] = useState<{ [key: string]: { type: 'success' | 'error'; message: string } }>({});
 
   // Overview data
   const [overview, setOverview] = useState<SystemOverview | null>(null);
@@ -147,6 +176,99 @@ const Admin: React.FC = () => {
     }
   };
 
+  // Fetch Inside Credentials
+  const fetchInsideCredentials = async () => {
+    try {
+      const serverCreds = await getInsideCreds();
+      let creds = { username: serverCreds.username || '', password: serverCreds.password || '' };
+      const saved = localStorage.getItem('fptCreds');
+      if (saved) {
+        try {
+          const localCreds = JSON.parse(saved);
+          if (!creds.username && localCreds.username) creds.username = localCreds.username;
+          if (!creds.password && localCreds.password) creds.password = localCreds.password;
+        } catch {}
+      }
+      setInsideCreds(creds);
+    } catch {
+      const saved = localStorage.getItem('fptCreds');
+      if (saved) {
+        try {
+          setInsideCreds(JSON.parse(saved));
+        } catch {}
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (token) {
+      fetchInsideCredentials();
+    }
+  }, [token]);
+
+  const handleSaveInside = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!insideCreds.username.trim()) {
+      setInsideFeedback({ type: 'error', message: 'Vui lòng nhập tên tài khoản Inside.' });
+      return;
+    }
+    setIsSavingInsideCreds(true);
+    setInsideFeedback(null);
+    try {
+      await saveInsideCreds(insideCreds);
+      localStorage.setItem('fptCreds', JSON.stringify(insideCreds));
+      setInsideFeedback({ 
+        type: 'success', 
+        message: 'Đã lưu tài khoản Inside thành công! Hệ thống sẽ dùng tài khoản này để tự động xác thực các chuỗi.' 
+      });
+      fetchOverview();
+      setTimeout(() => setInsideFeedback(null), 5000);
+    } catch (err: any) {
+      setInsideFeedback({ 
+        type: 'error', 
+        message: err.message || 'Lỗi khi lưu tài khoản Inside lên máy chủ!' 
+      });
+    } finally {
+      setIsSavingInsideCreds(false);
+    }
+  };
+
+  const handleTestChainLogin = async (chain: 'fpt_shop' | 'long_chau' | 'vaccine') => {
+    if (!insideCreds.username || !insideCreds.password) {
+      setChainFeedback(prev => ({
+        ...prev,
+        [chain]: { type: 'error', message: 'Vui lòng nhập và lưu tài khoản Inside trước khi kiểm tra.' }
+      }));
+      return;
+    }
+    setTestingChain(chain);
+    setChainFeedback(prev => ({
+      ...prev,
+      [chain]: { type: 'success', message: 'Đang gửi yêu cầu đăng nhập ngầm đến backend...' }
+    }));
+    try {
+      if (chain === 'fpt_shop') {
+        await startFptShopAuth(insideCreds);
+      } else if (chain === 'long_chau') {
+        await startLongChauAuth(insideCreds);
+      } else if (chain === 'vaccine') {
+        await startVaccineAuth(insideCreds);
+      }
+      setChainFeedback(prev => ({
+        ...prev,
+        [chain]: { type: 'success', message: 'Yêu cầu đã được gửi! Đang kiểm tra lại trạng thái sau 3s...' }
+      }));
+      setTimeout(fetchOverview, 3500);
+    } catch (err: any) {
+      setChainFeedback(prev => ({
+        ...prev,
+        [chain]: { type: 'error', message: err.message || 'Lỗi gửi yêu cầu đăng nhập chuỗi' }
+      }));
+    } finally {
+      setTestingChain(null);
+    }
+  };
+
   // 1. Verify token on load
   useEffect(() => {
     if (token) {
@@ -168,7 +290,9 @@ const Admin: React.FC = () => {
   const fetchOverview = async () => {
     try {
       setIsLoadingOverview(true);
-      const res = await fetch('/api/admin/overview');
+      const res = await fetch('/api/admin/overview', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (res.ok) {
         const data = await res.json();
         setOverview(data);
@@ -204,7 +328,9 @@ const Admin: React.FC = () => {
       if (logSearch.trim()) {
         params.append('search', logSearch.trim());
       }
-      const res = await fetch(`/api/admin/logs?${params.toString()}`);
+      const res = await fetch(`/api/admin/logs?${params.toString()}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (res.ok) {
         const data = await res.json();
         setLogs(data.logs || []);
@@ -240,7 +366,10 @@ const Admin: React.FC = () => {
   const handleClearLogs = async () => {
     if (!confirm('Bạn có chắc muốn xóa sạch log trên màn hình không?')) return;
     try {
-      await fetch('/api/admin/logs', { method: 'DELETE' });
+      await fetch('/api/admin/logs', { 
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       setLogs([]);
     } catch (err) {
       console.error("Lỗi khi xóa log:", err);
@@ -445,7 +574,10 @@ const Admin: React.FC = () => {
     setIsTestingSync(true);
     setTestSyncResult(null);
     try {
-      const res = await fetch('/api/admin/test-sync/fpt', { method: 'POST' });
+      const res = await fetch('/api/admin/test-sync/fpt', { 
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       const data = await res.json();
       setTestSyncResult({
         success: data.success,
@@ -502,7 +634,17 @@ const Admin: React.FC = () => {
   };
 
   // Handle Logout
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    if (token) {
+      try {
+        await fetch('/api/admin/logout', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } catch {
+        // Ignore network errors on logout
+      }
+    }
     localStorage.removeItem('admin_token');
     setToken(null);
   };
@@ -657,6 +799,13 @@ const Admin: React.FC = () => {
             </button>
 
             <button
+              onClick={() => navigate('/admin')}
+              className="px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 rounded-lg text-xs font-medium border border-indigo-500/20 transition-colors"
+            >
+              ← Test Control Center
+            </button>
+
+            <button
               onClick={() => navigate('/dashboard')}
               className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium border border-slate-700 transition-colors"
             >
@@ -676,7 +825,20 @@ const Admin: React.FC = () => {
         <div className="flex items-center justify-start border-b border-slate-800 pb-3 gap-2 overflow-x-auto">
           <button
             type="button"
-            onClick={() => setActiveTab('autosync')}
+            onClick={() => handleTabChange('inside')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              activeTab === 'inside'
+                ? 'bg-white text-slate-950 shadow-sm'
+                : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 border border-slate-800/60'
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${insideCreds.username ? 'bg-amber-400' : 'bg-slate-600'}`} />
+            Tài khoản Inside
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleTabChange('autosync')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
               activeTab === 'autosync'
                 ? 'bg-white text-slate-950 shadow-sm'
@@ -689,7 +851,7 @@ const Admin: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => setActiveTab('totp')}
+            onClick={() => handleTabChange('totp')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
               activeTab === 'totp'
                 ? 'bg-white text-slate-950 shadow-sm'
@@ -702,7 +864,7 @@ const Admin: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => setActiveTab('logs')}
+            onClick={() => handleTabChange('logs')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
               activeTab === 'logs'
                 ? 'bg-white text-slate-950 shadow-sm'
@@ -714,7 +876,7 @@ const Admin: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => setActiveTab('audit')}
+            onClick={() => handleTabChange('audit')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'audit'
                 ? 'bg-white text-slate-950 shadow-sm'
@@ -724,6 +886,295 @@ const Admin: React.FC = () => {
             Thông báo & Mạng
           </button>
         </div>
+
+        {/* ======================================================== */}
+        {/* TAB: TÀI KHOẢN INSIDE (Inside / SSO Account Configuration) */}
+        {/* ======================================================== */}
+        {activeTab === 'inside' && (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+              <div>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <User size={18} className="text-amber-400" />
+                  Cấu hình Tài khoản Inside / SSO FPT
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Tài khoản dùng chung để xác thực và đồng bộ dữ liệu ngầm cho cả 3 chuỗi: <strong>FPT Shop</strong>, <strong>Long Châu</strong>, và <strong>Vaccine</strong>.
+                </p>
+              </div>
+
+              {insideCreds.username ? (
+                <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 self-start sm:self-auto flex items-center gap-1.5">
+                  <CheckCircle2 size={14} className="text-emerald-400" /> Đã cấu hình: {insideCreds.username}
+                </span>
+              ) : (
+                <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 self-start sm:self-auto flex items-center gap-1.5">
+                  <AlertCircle size={14} className="text-amber-400" /> Chưa cấu hình
+                </span>
+              )}
+            </div>
+
+            {/* Feedback Alert */}
+            {insideFeedback && (
+              <div className={`p-3.5 rounded-xl text-xs font-medium border flex items-center gap-2.5 ${
+                insideFeedback.type === 'success' 
+                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' 
+                  : 'bg-rose-500/10 border-rose-500/20 text-rose-300'
+              }`}>
+                {insideFeedback.type === 'success' ? <CheckCircle2 size={16} className="shrink-0" /> : <AlertCircle size={16} className="shrink-0" />}
+                <span>{insideFeedback.message}</span>
+              </div>
+            )}
+
+            {/* Main Form */}
+            <form onSubmit={handleSaveInside} className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-slate-950/60 p-5 rounded-2xl border border-slate-800/80">
+              {/* Username Input */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <User size={14} className="text-slate-400" />
+                  Tài khoản Inside (Username / Email SSO)
+                </label>
+                <input
+                  type="text"
+                  value={insideCreds.username}
+                  onChange={(e) => setInsideCreds(prev => ({ ...prev, username: e.target.value }))}
+                  placeholder="Ví dụ: TinMT2 hoặc email@fpt.com"
+                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700/80 rounded-xl text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-all font-mono"
+                  required
+                />
+                <p className="text-[11px] text-slate-500">Tên đăng nhập hệ thống nội bộ FRT / FPT SSO.</p>
+              </div>
+
+              {/* Password Input */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Lock size={14} className="text-slate-400" />
+                  Mật khẩu (Password)
+                </label>
+                <div className="relative flex items-center">
+                  <input
+                    type={showInsidePassword ? 'text' : 'password'}
+                    value={insideCreds.password}
+                    onChange={(e) => setInsideCreds(prev => ({ ...prev, password: e.target.value }))}
+                    placeholder="Nhập mật khẩu tài khoản Inside"
+                    className="w-full pl-3.5 pr-10 py-2.5 bg-slate-900 border border-slate-700/80 rounded-xl text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-all font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowInsidePassword(prev => !prev)}
+                    className="absolute right-3 p-1 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                    title={showInsidePassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                  >
+                    {showInsidePassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-500">Mật khẩu được lưu trữ an toàn trong máy chủ cục bộ.</p>
+              </div>
+
+              {/* Save & Reset Actions */}
+              <div className="md:col-span-2 pt-2 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800">
+                <div className="text-xs text-slate-400 flex items-center gap-1.5">
+                  <KeyRound size={14} className="text-amber-400" />
+                  <span>Dữ liệu này sẽ được đồng bộ và lưu vĩnh viễn trên máy chủ backend.</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="submit"
+                    disabled={isSavingInsideCreds}
+                    className="px-5 py-2.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white text-xs font-bold rounded-xl shadow-md shadow-amber-900/30 transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {isSavingInsideCreds ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        <span>Đang lưu...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save size={14} />
+                        <span>Lưu thông tin tài khoản Inside</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
+
+            {/* Chains Authentication Status & Test Triggers */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                    Trạng thái kết nối 3 chuỗi
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Kiểm tra và kích hoạt phiên đăng nhập tự động cho từng chuỗi hệ thống
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={fetchOverview}
+                  className="px-2.5 py-1 text-xs text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                  title="Tải lại trạng thái"
+                >
+                  <RefreshCw size={13} className={isLoadingOverview ? 'animate-spin' : ''} />
+                  <span>Làm mới</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* 1. FPT Shop */}
+                <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-3 flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Store size={16} className="text-rose-400" />
+                        <span className="text-xs font-bold text-white">FPT Shop</span>
+                      </div>
+                      {chains?.fpt_shop?.authenticated ? (
+                        <span className="px-2 py-0.5 rounded text-[10.5px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          Đã xác thực
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded text-[10.5px] font-semibold bg-slate-800 text-slate-400 border border-slate-700">
+                          {chains?.fpt_shop?.status || 'Chưa đăng nhập'}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Quản lý tài khoản đăng nhập portal FPT Shop để lấy báo cáo ticket và calllog.
+                    </p>
+                    {chainFeedback['fpt_shop'] && (
+                      <p className={`text-[11px] font-medium ${chainFeedback['fpt_shop'].type === 'success' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {chainFeedback['fpt_shop'].message}
+                      </p>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleTestChainLogin('fpt_shop')}
+                    disabled={testingChain === 'fpt_shop'}
+                    className="w-full mt-2 py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {testingChain === 'fpt_shop' ? (
+                      <Loader2 size={13} className="animate-spin text-rose-400" />
+                    ) : (
+                      <Store size={13} className="text-rose-400" />
+                    )}
+                    <span>Kiểm tra / Đăng nhập FPT Shop</span>
+                  </button>
+                </div>
+
+                {/* 2. Long Châu */}
+                <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-3 flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Pill size={16} className="text-blue-400" />
+                        <span className="text-xs font-bold text-white">Long Châu</span>
+                      </div>
+                      {chains?.long_chau?.authenticated ? (
+                        <span className="px-2 py-0.5 rounded text-[10.5px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          Đã xác thực
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded text-[10.5px] font-semibold bg-slate-800 text-slate-400 border border-slate-700">
+                          {chains?.long_chau?.status || 'Chưa đăng nhập'}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Sử dụng chung tài khoản Inside SSO để xác thực hệ thống Dược phẩm Long Châu.
+                    </p>
+                    {chainFeedback['long_chau'] && (
+                      <p className={`text-[11px] font-medium ${chainFeedback['long_chau'].type === 'success' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {chainFeedback['long_chau'].message}
+                      </p>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleTestChainLogin('long_chau')}
+                    disabled={testingChain === 'long_chau'}
+                    className="w-full mt-2 py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {testingChain === 'long_chau' ? (
+                      <Loader2 size={13} className="animate-spin text-blue-400" />
+                    ) : (
+                      <Pill size={13} className="text-blue-400" />
+                    )}
+                    <span>Kiểm tra / Đăng nhập Long Châu</span>
+                  </button>
+                </div>
+
+                {/* 3. Vaccine */}
+                <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-3 flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <ShieldPlus size={16} className="text-teal-400" />
+                        <span className="text-xs font-bold text-white">Vaccine</span>
+                      </div>
+                      {chains?.vaccine?.authenticated ? (
+                        <span className="px-2 py-0.5 rounded text-[10.5px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          Đã xác thực
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded text-[10.5px] font-semibold bg-slate-800 text-slate-400 border border-slate-700">
+                          {chains?.vaccine?.status || 'Chưa đăng nhập'}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Sử dụng chung tài khoản Inside SSO để xác thực hệ thống Tiêm chủng Vaccine.
+                    </p>
+                    {chainFeedback['vaccine'] && (
+                      <p className={`text-[11px] font-medium ${chainFeedback['vaccine'].type === 'success' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {chainFeedback['vaccine'].message}
+                      </p>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleTestChainLogin('vaccine')}
+                    disabled={testingChain === 'vaccine'}
+                    className="w-full mt-2 py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {testingChain === 'vaccine' ? (
+                      <Loader2 size={13} className="animate-spin text-teal-400" />
+                    ) : (
+                      <ShieldPlus size={13} className="text-teal-400" />
+                    )}
+                    <span>Kiểm tra / Đăng nhập Vaccine</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* TOTP Quick Hint */}
+            <div className="p-4 bg-indigo-950/30 border border-indigo-900/50 rounded-xl flex items-center justify-between gap-4 text-xs">
+              <div className="flex items-center gap-3">
+                <KeyRound size={20} className="text-indigo-400 shrink-0" />
+                <div>
+                  <span className="font-bold text-indigo-200 block">Cần xác thực 2 bước (TOTP / OTP)?</span>
+                  <span className="text-slate-400 text-[11px]">
+                    Cấu hình Secret Key tại tab <strong>Authenticator</strong> để bot tự tính toán mã OTP khi đăng nhập.
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleTabChange('totp')}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-semibold transition-colors shrink-0 cursor-pointer text-xs"
+              >
+                Mở tab Authenticator →
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ======================================================== */}
         {/* TAB: TỰ ĐỘNG ĐỒNG BỘ (Clean Auto-Sync Scheduler) */}

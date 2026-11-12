@@ -36,7 +36,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from app.api import health, fpt_shop, long_chau, long_chau_dashboard, vaccine, vaccine_dashboard, notifications, admin, employees, auto_sync, inside
+from app.api import health, fpt_shop, long_chau, long_chau_dashboard, vaccine, vaccine_dashboard, notifications, admin, employees, auto_sync, inside, test_proxy
 
 app.include_router(health.router, prefix="/api")
 app.include_router(inside.router, prefix="/api")
@@ -49,6 +49,7 @@ app.include_router(vaccine.router, prefix="/api/vaccine")
 app.include_router(vaccine_dashboard.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api/notifications")
 app.include_router(auto_sync.router, prefix="/api/auto-sync")
+app.include_router(test_proxy.router)
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse

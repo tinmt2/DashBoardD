@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { 
-  Activity, LayoutDashboard, Map, Users, ShieldAlert, Settings, Bell, Palette, 
+  Activity, LayoutDashboard, Map, Users, Settings, Bell, Palette, 
   Save, X, Store, Pill, ShieldPlus, BarChart3, Users2, ChevronLeft, ChevronRight,
-  CheckCircle2, AlertCircle, Eye, EyeOff, Menu, RefreshCw, Clock, Calendar, Layers, Check, Loader2, Play
+  CheckCircle2, AlertCircle, Eye, EyeOff, Menu, RefreshCw, Clock, Calendar, Layers, Check, Loader2, Play,
+  Sliders
 } from 'lucide-react';
 import TitleBar from './TitleBar';
 import { getFptShopAuthStatus, startFptShopAuth } from '../../services/fptShopApi';
@@ -34,8 +35,7 @@ const Layout: React.FC = () => {
   const navigate = useNavigate();
   const { unreadCount, togglePanel } = useNotification();
   const { isSyncing, syncStepText, syncDuration, syncToast, setSyncToast, syncAll, syncChain } = useSync();
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+
   const [fptCreds, setFptCreds] = useState({ username: '', password: '' });
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
@@ -138,30 +138,10 @@ const Layout: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const handleOpenSettings = () => setIsSettingsOpen(true);
+    const handleOpenSettings = () => navigate('/admin/system?tab=inside');
     window.addEventListener('open-inside-settings', handleOpenSettings);
     return () => window.removeEventListener('open-inside-settings', handleOpenSettings);
   }, []);
-
-  const saveSettings = () => {
-    localStorage.setItem('fptCreds', JSON.stringify(fptCreds));
-    setIsSettingsOpen(false);
-    // Persist permanently on backend server
-    saveInsideCreds(fptCreds).catch(err => {
-      console.error('Failed to persist Inside creds to backend:', err);
-    });
-    if (fptCreds.username && fptCreds.password) {
-      startFptShopAuth(fptCreds).catch(() => {});
-      startLongChauAuth(fptCreds).catch(() => {});
-      startVaccineAuth(fptCreds).catch(() => {});
-    }
-    setSyncToast({
-      show: true,
-      type: 'success',
-      title: 'Đã lưu tài khoản Inside',
-      subtitle: 'Hệ thống sẽ dùng tài khoản này để tự động xác thực các chuỗi',
-    });
-  };
 
   const location = useLocation();
 
@@ -177,6 +157,13 @@ const Layout: React.FC = () => {
     if (path.includes('vaccine')) return 'Vaccine';
     if (path.includes('employees')) return 'Quản lý nhân viên';
     if (path.includes('analytics')) return 'Analytics';
+    if (path.includes('/admin/camera')) return 'Check Camera & DVR';
+    if (path.includes('/admin/ticket')) return 'Ticket SSC';
+    if (path.includes('/admin/motion')) return 'Motion Analytics';
+    if (path.includes('/admin/zalo')) return 'Zalo Monitor';
+    if (path.includes('/admin/settings')) return 'Cài đặt Test';
+    if (path.includes('/admin/system')) return 'Quản trị Hệ thống';
+    if (path.startsWith('/admin') || path.startsWith('/test')) return 'Quản trị & Test';
     return 'DashBoardD';
   };
 
@@ -193,13 +180,14 @@ const Layout: React.FC = () => {
     }
   };
   // Active and hover styling for navigation links with per-chain theme accents
-  const getNavItemClass = (isActive: boolean, theme: 'indigo' | 'rose' | 'blue' | 'teal' | 'violet') => {
+  const getNavItemClass = (isActive: boolean, theme: 'indigo' | 'rose' | 'blue' | 'teal' | 'violet' | 'amber') => {
     const activeThemes = {
       indigo: 'bg-indigo-50/90 text-indigo-700 font-bold border-indigo-100/90 shadow-[0_1px_4px_rgba(99,102,241,0.08)]',
       rose: 'bg-rose-50/90 text-rose-700 font-bold border-rose-100/90 shadow-[0_1px_4px_rgba(244,63,94,0.08)]',
       blue: 'bg-blue-50/90 text-blue-700 font-bold border-blue-100/90 shadow-[0_1px_4px_rgba(37,99,235,0.08)]',
       teal: 'bg-teal-50/90 text-teal-700 font-bold border-teal-100/90 shadow-[0_1px_4px_rgba(20,184,166,0.08)]',
       violet: 'bg-violet-50/90 text-violet-700 font-bold border-violet-100/90 shadow-[0_1px_4px_rgba(139,92,246,0.08)]',
+      amber: 'bg-amber-50/90 text-amber-700 font-bold border-amber-100/90 shadow-[0_1px_4px_rgba(245,158,11,0.08)]',
     };
 
     const indicatorThemes = {
@@ -208,6 +196,7 @@ const Layout: React.FC = () => {
       blue: 'bg-gradient-to-b from-blue-500 to-indigo-600 shadow-[0_0_8px_rgba(37,99,235,0.6)]',
       teal: 'bg-gradient-to-b from-teal-500 to-emerald-600 shadow-[0_0_8px_rgba(20,184,166,0.6)]',
       violet: 'bg-gradient-to-b from-violet-500 to-purple-600 shadow-[0_0_8px_rgba(139,92,246,0.6)]',
+      amber: 'bg-gradient-to-b from-amber-500 to-orange-600 shadow-[0_0_8px_rgba(245,158,11,0.6)]',
     };
 
     const iconThemes = {
@@ -216,6 +205,7 @@ const Layout: React.FC = () => {
       blue: 'text-blue-600',
       teal: 'text-teal-600',
       violet: 'text-violet-600',
+      amber: 'text-amber-600',
     };
 
     return {
@@ -270,7 +260,7 @@ const Layout: React.FC = () => {
               ${isHovered && isCollapsed ? 'md:shadow-[8px_0_32px_rgba(0,0,0,0.08)]' : 'md:shadow-[4px_0_24px_rgba(0,0,0,0.02)]'}
             `}
           >
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1.5 flex-1 min-h-0 overflow-y-auto pr-0.5">
               {/* Mobile Drawer Header with Close Button */}
               <div className="flex items-center justify-between pb-3 pt-1 border-b border-slate-200/60 md:hidden">
                 <div className="flex items-center gap-2 pl-1">
@@ -443,6 +433,9 @@ const Layout: React.FC = () => {
                     );
                   }}
                 </NavLink>
+
+
+
               </div>
             </div>
 
@@ -484,17 +477,41 @@ const Layout: React.FC = () => {
                 )}
               </button>
 
-              <button 
-                type="button"
-                onClick={() => setIsSettingsOpen(true)} 
-                className={`group flex items-center rounded-xl text-[13px] font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all cursor-pointer ${
-                  effectiveCollapsed ? 'justify-center w-10 h-10 mx-auto' : 'px-3 py-2 gap-2.5 w-full text-left'
-                }`}
-                title="Inside"
+              <NavLink 
+                to="/admin" 
+                title="Quản trị"
+                className={({ isActive }) => {
+                  const isActuallyActive = isActive || location.pathname.startsWith('/admin') || location.pathname.startsWith('/test');
+                  return `group flex items-center rounded-xl text-[13px] font-semibold transition-all relative cursor-pointer ${
+                    effectiveCollapsed ? 'justify-center w-10 h-10 mx-auto' : 'px-3 py-2 gap-2.5 w-full text-left'
+                  } ${
+                    isActuallyActive 
+                      ? 'bg-amber-50/90 text-amber-800 font-bold border border-amber-200/80 shadow-[0_1px_4px_rgba(245,158,11,0.08)]' 
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+                  }`;
+                }}
               >
-                <Settings size={17} strokeWidth={2.3} className="text-slate-400 group-hover:text-slate-700 group-hover:scale-110 transition-all shrink-0" />
-                {!effectiveCollapsed && <span className="truncate">Inside</span>}
-              </button>
+                {({ isActive }) => {
+                  const isActuallyActive = isActive || location.pathname.startsWith('/admin') || location.pathname.startsWith('/test');
+                  return (
+                    <>
+                      <Sliders 
+                        size={17} 
+                        strokeWidth={2.3} 
+                        className={`shrink-0 transition-transform ${
+                          isActuallyActive 
+                            ? 'text-amber-600' 
+                            : 'text-slate-400 group-hover:text-slate-700 group-hover:scale-110'
+                        }`} 
+                      />
+                      {!effectiveCollapsed && <span className="truncate">Quản trị</span>}
+                      {isActuallyActive && (
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full bg-gradient-to-b from-amber-500 to-orange-600 shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
+                      )}
+                    </>
+                  );
+                }}
+              </NavLink>
               
               {/* Last updated container at the bottom of the sidebar */}
               <div id="sidebar-footer-time" className={`${effectiveCollapsed ? 'p-1 flex justify-center' : 'pt-2'} mt-0.5`}></div>
@@ -558,12 +575,12 @@ const Layout: React.FC = () => {
                 )}
               </button>
               <button 
-                type="button"
-                onClick={() => setIsSettingsOpen(true)}
+                type="button" 
+                onClick={() => navigate('/admin')} 
                 className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
-                title="Inside"
+                title="Quản trị"
               >
-                <Settings size={18} />
+                <Sliders size={18} />
               </button>
             </div>
           </header>
@@ -577,98 +594,6 @@ const Layout: React.FC = () => {
             <div key={location.pathname} className="flex-1 flex flex-col min-w-0 animate-page-glide">
               <Outlet />
             </div>
-            
-            {isSettingsOpen && createPortal(
-              <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-fade-in">
-                <div className="bg-white rounded-2xl shadow-2xl w-[440px] max-w-[92vw] overflow-hidden border border-slate-100">
-                  <div className="flex items-center justify-between p-4.5 border-b border-slate-100 bg-slate-50/80">
-                    <h3 className="font-bold text-slate-800 flex items-center gap-2 text-base">
-                      <Settings size={19} className="text-indigo-600" /> Cài đặt Tài khoản Inside
-                    </h3>
-                    <button 
-                      onClick={() => setIsSettingsOpen(false)} 
-                      className="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                    >
-                      <X size={18} />
-                    </button>
-                  </div>
-
-                  <div className="p-5 space-y-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Tài khoản Inside (Username)</label>
-                      <input 
-                        type="text" 
-                        value={fptCreds.username} 
-                        onChange={e => setFptCreds({...fptCreds, username: e.target.value})} 
-                        className="w-full px-3.5 py-2.5 bg-white text-slate-900 placeholder:text-slate-400 font-medium border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm shadow-xs" 
-                        placeholder="Nhập tên đăng nhập Inside / SSO" 
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Mật khẩu (Password)</label>
-                      <div className="relative flex items-center">
-                        <input 
-                          type={showPassword ? "text" : "password"} 
-                          value={fptCreds.password} 
-                          onChange={e => setFptCreds({...fptCreds, password: e.target.value})} 
-                          className="w-full px-3.5 py-2.5 pr-10 bg-white text-slate-900 placeholder:text-slate-400 font-medium border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm shadow-xs" 
-                          placeholder="Nhập mật khẩu" 
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(prev => !prev)}
-                          className="absolute right-3 text-slate-400 hover:text-slate-600 p-1 cursor-pointer transition-colors"
-                          title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-                        >
-                          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="p-3 bg-indigo-50/70 border border-indigo-100 rounded-xl text-xs text-indigo-900 leading-relaxed">
-                      💡 Tài khoản Inside được sử dụng chung để xác thực và đồng bộ dữ liệu cho cả 3 chuỗi: <strong>FPT Shop</strong>, <strong>Long Châu</strong>, và <strong>Vaccine</strong>.
-                    </div>
-
-                    {/* Admin Auto-Sync Banner Link */}
-                    <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3 text-xs">
-                      <div className="flex items-center gap-2 text-slate-700">
-                        <Clock size={16} className="text-indigo-600 shrink-0" />
-                        <span>Lịch tự động đồng bộ ngầm được quản lý tại trang <strong>Quản trị Admin</strong>.</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsSettingsOpen(false);
-                          navigate('/admin');
-                        }}
-                        className="px-2.5 py-1 text-xs font-bold text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer shrink-0"
-                      >
-                        Quản lý →
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="p-4 border-t border-slate-100 flex justify-end gap-2.5 bg-slate-50/80">
-                    <button 
-                      type="button"
-                      onClick={() => setIsSettingsOpen(false)} 
-                      className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
-                    >
-                      Hủy
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={saveSettings} 
-                      className="px-5 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors flex items-center gap-2 cursor-pointer shadow-sm"
-                    >
-                      <Save size={16} /> Lưu cài đặt
-                    </button>
-                  </div>
-                </div>
-              </div>,
-              document.body
-            )}
             <NotificationPanel />
 
             {/* Global Realtime Sync Status Banner */}
